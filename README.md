@@ -1,5 +1,3 @@
-# ** 🚧 UNDER CONSTRUCTION 🚧 **
-
 # BDO Huffman Decoder
 
 This project explores implementing a specific
