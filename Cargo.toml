@@ -3,4 +3,17 @@ name = "bdo-huffman-rs"
 version = "0.1.0"
 edition = "2021"
 
+[profile.release]
+debug = 1
+
 [dependencies]
+divan = "0.1.17"
+mimalloc = "0.1.43"
+nohash-hasher = "0.2.0"
+reqwest = {version = "0.12.9", features = ["blocking", "json"] }
+serde_json = "1.0.133"
+
+[[bench]]
+name = "benches"
+harness = false
+
