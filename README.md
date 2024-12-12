@@ -7,32 +7,28 @@ This project explores implementing a specific
 decompress packet contents in responses from calls to BDO's GetWorldMarket
 endpoints.
 
-A few different approaches of decoding the Huffman message will be explored.
+A few different approaches of decoding the Huffman message are explored.
 
-- tree traversal baseline
-  ```
-  large (msg_len=70.5k)           318 µs    221.8 MB/s
-  medium (msg_len=22.5k)          93.29 µs  241.6 MB/s
-  small (msg_len=5.5k)            23.89 µs  232.5 MB/s
-  ```
-- tree traversal optimized
-  ```
-  large (msg_len=70.5k)           168.1 µs  419.6 MB/s
-  medium (msg_len=22.5k)          25.79 µs  873.9 MB/s
-  small (msg_len=5.5k)            7.399 µs  750.9 MB/s
-  ```
-- single symbol table lookup
-- multiple symbol table lookup
-- single symbol SIMD processing
+## Full Packet Processing Results
+
+Includes all steps to parse and decode the incoming packet.
+
+| Test Message Size | Nested BaseLine | Nested Optimized | Multi-Symbol Table | Baseline / 🚀 |
+|:-----------------:|:---------------:|:----------------:|:------------------:|:-------------:|
+|       70.5k       |    368.4 µs     |     169.9 µs     |    131.6 µs 🚀     |     2.79      |
+|       33.3k       |    170.9 µs     |     60.29 µs     |    46.19 µs 🚀     |     3.69      |
+|       22.5k       |    110.1 µs     |   26.49 µs 🚀    |      31.59 µs      |     4.15      |
+|       11.1k       |    47.99 µs     |   13.29 µs 🚀    |      17.29 µs      |     3.61      |
+|       5.5k        |    31.19 µs     |   8.099 µs 🚀    |      11.29 µs      |     2.76      |
+|        40b        |    693.5 ns     |   587.2 ns 🚀    |      3.399 µs      |     1.18      |
+
+_Tested on a Ryzen 5700G_
 
 ## Usage
 Clone the repo and run any of:
 
 - `cargo test`
 - `cargo bench`
-- `cargo run --example`
-
-A few examples are included for profiling and summary information dumping.
 
 ## BDO's Huffman
 
@@ -85,17 +81,16 @@ types:
         encoding: UTF8
 ```
 
-The symbol table can consist of `-`, `0-9` and `|`. They are always in the same
-order (ASCII value order) and if a symbol doesn't occur in the message it is
-omitted from the symbol table.
+The symbol table can consist of `-`, `0-9` and `|`.
 
 Once decoded '|' and '-' denote record and field delimiters respectively, they
 will always be present in the table. There are four fields in each record:
-'item', 'count', 'price' and 'cumulative count'. This repo is only concerned
-with decoding so parsing the decoded message is out of scope but if someone was
-parsing the decoded messages (perhaps to feed into a database) then
-incorporating the record structure and emitting an update message into the
-decoder should be very efficient vs post processing.
+'item', 'count', 'price' and 'cumulative count'.
+
+This repo is only concerned with decoding so parsing the decoded message is out
+of scope but if someone was parsing the decoded messages (perhaps to feed into a
+database) then incorporating the record structure and emitting an update message
+into the decoder should be very efficient vs post processing.
 
 #### A note on the symbol table and prefix lengths.
 
@@ -103,9 +98,7 @@ When parsing the packet ensure that whatever container is used to store the
 symbol and frequency has stable order! The input order is crucial to the proper
 building of the Huffman tree.
 
-The minimum prefix len is 1, the maximum observed prefix is 7.
-(My testing with heavily skewed frequencies never resulted in a prefix greater
-than 7 but to be safe imagine 8 _could_ be possible.)
+The minimum prefix length is 1, the maximum observed prefix is 7.
 
 ### The Heap
 
@@ -118,8 +111,9 @@ they do provide the right ordering they may be sub-optimal for this use case.
 What you want is a simple collection and simple _sift-up_ and _sift-down_
 procedures implemented directly as _push_ and _pop_ functions respectively.
 
-An example in python pseudo code where `heap` os a simple list and `node` is a
-simple object containing `['symbol', 'freq', 'left_child', 'right_child']`
+A simple Min-Heap example implementation in python where `heap` is a simple list
+and `node` is a simple object containing a comparison function using 'frequency'
+would look something like this.
 
 ```python
 def push(heap, node):
@@ -156,14 +150,14 @@ The response of a GetWorldMarket request is for a particular main and sub
 category pair. The sizes of these categories varies dramatically with the
 largest being >70kb decompressed and the smallest only 40b.
 
-|Group        | Main | Sub | Decoded Size  |
-|:------------|------|-----|---------------|
-|large        | 55   | 4   |70.5k          |
-|large_medium | 55   | 3   |33.3k          |
-|medium       | 55   | 2   |22.5k          |
-|medium_small | 55   | 1   |11.1k          |
-|small        | 25   | 2   |5.5k           |
-|small_min    | 75   | 6   |40b            |
+| Group        | Main | Sub | Decoded Size |
+|:-------------|------|-----|--------------|
+| large        | 55   | 4   | 70.5k        |
+| large_medium | 55   | 3   | 33.3k        |
+| medium       | 55   | 2   | 22.5k        |
+| medium_small | 55   | 1   | 11.1k        |
+| small        | 25   | 2   | 5.5k         |
+| small_min    | 75   | 6   | 40b          |
 
 While the message size is not exactly tied to the number of items in a category
 it is directly tied to it.
@@ -182,9 +176,7 @@ difficult time being amortized away before decoding is completed. Also, since
 the symbols are dynamic and the encoding scheme is set any optimizations that
 require specific encoding or embeddings are also not useful.
 
-### Tree Traversal
-
-#### Baseline
+### Baseline
 ```
 message_decoding_nested_baseline
 ├─ large (msg_len=70.5k)           318 µs    
@@ -205,7 +197,7 @@ message_decoding_nested_baseline
 - iterates over a BitVec while traversing a tree of nested nodes
 - has no need for prefix codes
 
-#### Optimized
+### Optimized
 ```
 message_decoding_nested_optimized
 ├─ large (msg_len=70.5k)           168.1 µs  
@@ -228,3 +220,35 @@ message_decoding_nested_optimized
 - uses direct mut_ptr symbol assignment to decoded message buffer
 - converts decoded message buffer to a String without allocation or copying
 - has no need for prefix codes
+
+### Multi-Symbol Table Lookup
+```
+message_decoding_with_table
+├─ large (msg_len=70.5k)           121 µs    
+│                                  582.8 MB/s
+├─ large_medium (msg_len=33.3k)    42.59 µs  
+│                                  782.3 MB/s
+├─ medium (msg_len=22.5k)          27.89 µs  
+│                                  808.2 MB/s
+├─ medium_small (msg_len=11.1k)    13.49 µs  
+│                                  827.5 MB/s
+├─ small (msg_len=5.5k)            7.899 µs  
+│                                  703.4 MB/s
+╰─ small_min (msg_len=40b)         59.1 ns   
+                                   676.7 MB/s
+```
+- uses flat tree representation instead of nested which reduces extended prefix
+  building times from ~380 µs to 3.349 µs.
+
+- decodes integers 0..=255 to build extended prefix results into a table
+- uses a full byte of encoded message as the table index
+- extended prefixes contain 1 or more decoded symbols and bits used
+- manually unrolled 8 symbol matching (since the smallest prefix is '0')
+
+\* Note that these timings are better for the decoding but there is a little
+overhead and that overhead makes the table lookup method not viable for medium
+and small message sizes. The overhead is not represented in the bench results
+above but are present in the benches.  
+
+`cargo bench -- packet_decoding`.
+

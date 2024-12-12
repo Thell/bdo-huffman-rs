@@ -1,6 +1,9 @@
 use bit_vec::BitVec;
 
-use crate::{node::TreeNode, packet::Packet};
+use crate::{
+    node::TreeNode,
+    packet::{ExtendedPrefix, Packet},
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // Nested TreeNode Traversal - Baseline
@@ -111,6 +114,113 @@ pub fn decode_message_nested_optimized(packet: &Packet, nested_tree: &TreeNode) 
     }
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////
+// Flat Node Traversal
+pub fn decode_packet_with_table(content: &[u8]) -> String {
+    let packet = Packet::new(content);
+    let symbol_table = packet.symbol_table();
+    let tree = packet.flat_tree(&symbol_table);
+    let prefixes = packet.extended_prefixes(&tree);
+    decode_message_with_table(&packet, &prefixes)
+}
+
+// This approach uses a table of entries that contain symbols and bits used.
+// Each integer 0..=255 is decoded using tree traversal to build the table.
+// You are encouraged to profile this approach as well as view it in Godbolt as you can see the
+// hit counts at each of the symbol length checks in the profiler and see that there are
+// 8 instructions for each symbol past the first of each index using 9 uops.
+// This function really seems to benefit from look-ahead processing.
+pub fn decode_message_with_table(packet: &Packet, table: &Vec<ExtendedPrefix>) -> String {
+    let decoded_len = packet.decoded_bytes_len as usize;
+    let mut decoded: Vec<u8> = Vec::with_capacity(decoded_len);
+
+    let mut bit_buf = 0u16;
+    let mut bit_buf_remaining = 0;
+    let mut read_index = 0usize;
+    let mut write_index = 0usize;
+
+    loop {
+        if bit_buf_remaining < 8 && read_index < packet.encoded_message.len() {
+            let incoming_bits = packet.encoded_message[read_index] as u16;
+            bit_buf |= incoming_bits << (8 - bit_buf_remaining);
+            bit_buf_remaining += 8;
+            read_index += 1;
+        }
+
+        let index = (bit_buf >> 8) as usize;
+
+        unsafe {
+            let extended_prefix = table.get_unchecked(index);
+            let symbols = &extended_prefix.symbols;
+
+            bit_buf <<= extended_prefix.used_bits;
+            bit_buf_remaining -= extended_prefix.used_bits;
+
+            *decoded.as_mut_ptr().add(write_index) = *symbols.get_unchecked(0);
+            write_index += 1;
+            if write_index == decoded_len {
+                break;
+            }
+
+            if symbols.len() > 1 {
+                *decoded.as_mut_ptr().add(write_index) = *symbols.get_unchecked(1);
+                write_index += 1;
+                if write_index == decoded_len {
+                    break;
+                }
+            }
+            if symbols.len() > 2 {
+                *decoded.as_mut_ptr().add(write_index) = *symbols.get_unchecked(2);
+                write_index += 1;
+                if write_index == decoded_len {
+                    break;
+                }
+            }
+            if symbols.len() > 3 {
+                *decoded.as_mut_ptr().add(write_index) = *symbols.get_unchecked(3);
+                write_index += 1;
+                if write_index == decoded_len {
+                    break;
+                }
+            }
+            if symbols.len() > 4 {
+                *decoded.as_mut_ptr().add(write_index) = *symbols.get_unchecked(4);
+                write_index += 1;
+                if write_index == decoded_len {
+                    break;
+                }
+            }
+            if symbols.len() > 5 {
+                *decoded.as_mut_ptr().add(write_index) = *symbols.get_unchecked(5);
+                write_index += 1;
+                if write_index == decoded_len {
+                    break;
+                }
+            }
+            if symbols.len() > 6 {
+                *decoded.as_mut_ptr().add(write_index) = *symbols.get_unchecked(6);
+                write_index += 1;
+                if write_index == decoded_len {
+                    break;
+                }
+            }
+            if symbols.len() > 7 {
+                *decoded.as_mut_ptr().add(write_index) = *symbols.get_unchecked(7);
+                write_index += 1;
+                if write_index == decoded_len {
+                    break;
+                }
+            }
+        }
+    }
+
+    unsafe {
+        decoded.set_len(write_index);
+        let slice = std::slice::from_raw_parts(decoded.as_ptr(), decoded.len());
+        std::str::from_utf8_unchecked(slice).to_owned()
+    }
+}
+
 // MARK: Unit Tests
 
 #[cfg(test)]
@@ -120,12 +230,14 @@ mod tests {
 
     #[test]
     fn processes_packet_nested_baseline() {
+        // Tests the integrity of the full processing flow.
         let decoded_message = decode_packet_nested_baseline(&TEST_BYTES);
         assert_eq!(decoded_message, EXPECTED_MESSAGE);
     }
 
     #[test]
     fn decodes_message_nested_baseline() {
+        // Tests only the decoding algo.
         let packet = Packet::new(&TEST_BYTES);
         let nested_tree = packet.nested_tree(&EXPECTED_SYMBOL_TABLE);
 
@@ -139,16 +251,40 @@ mod tests {
 
     #[test]
     fn processes_packet_nested_optimized() {
+        // Tests the integrity of the full processing flow.
         let decoded_message = decode_packet_nested_optimized(&TEST_BYTES);
         assert_eq!(decoded_message, EXPECTED_MESSAGE);
     }
 
     #[test]
     fn decodes_message_nested_optimized() {
+        // Tests only the decoding algo.
         let packet = Packet::new(&TEST_BYTES);
         let nested_tree = packet.nested_tree(&EXPECTED_SYMBOL_TABLE);
         let decoded_message = decode_message_nested_optimized(&packet, &nested_tree);
 
+        assert_eq!(decoded_message, EXPECTED_MESSAGE);
+    }
+
+    #[test]
+    fn processes_packet_with_table() {
+        // Tests the integrity of the full processing flow.
+        let decoded_message = decode_packet_with_table(&TEST_BYTES);
+        assert_eq!(decoded_message, EXPECTED_MESSAGE);
+    }
+
+    #[test]
+    fn decodes_message_with_table() {
+        // Tests only the decoding algo.
+        let packet = Packet::new(&TEST_BYTES);
+        let tree = &packet.flat_tree(&EXPECTED_SYMBOL_TABLE);
+        let prefixes = packet.prefixes_from_flatnode(tree);
+        for prefix in prefixes {
+            println!("{:?}", prefix);
+        }
+        let prefix_table = packet.extended_prefixes(tree);
+        println!("{:?}", prefix_table);
+        let decoded_message = decode_message_with_table(&packet, &prefix_table);
         assert_eq!(decoded_message, EXPECTED_MESSAGE);
     }
 }
@@ -217,6 +353,32 @@ mod benches {
             .counter(BytesCount::from(packet.decoded_bytes_len))
             .bench_local(move || {
                 decode_message_nested_optimized(black_box(&packet), &nested_tree);
+            });
+    }
+
+    #[divan::bench(args = ALL_CASES)]
+    fn packet_decoding_with_table(bencher: Bencher, case: &Case) {
+        let response_bytes = &case.request();
+
+        bencher
+            .counter(ItemsCount::from(1usize))
+            .bench_local(move || {
+                black_box(decode_packet_with_table(black_box(response_bytes)));
+            });
+    }
+
+    #[divan::bench(args = ALL_CASES)]
+    fn message_decoding_with_table(bencher: Bencher, case: &Case) {
+        // Tests only the decoding algo.
+        let response_bytes = &case.request();
+        let packet = Packet::new(response_bytes);
+        let tree = &packet.flat_tree(&packet.symbol_table());
+        let prefix_table = &packet.extended_prefixes(tree);
+
+        bencher
+            .counter(BytesCount::from(packet.decoded_bytes_len))
+            .bench_local(move || {
+                decode_message_with_table(black_box(&packet), prefix_table);
             });
     }
 }
