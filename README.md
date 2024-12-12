@@ -9,7 +9,18 @@ endpoints.
 
 A few different approaches of decoding the Huffman message will be explored.
 
-- tree traversal: both original and optimized (uses unsafe)
+- tree traversal baseline
+  ```
+  large (msg_len=70.5k)           318 µs    221.8 MB/s
+  medium (msg_len=22.5k)          93.29 µs  241.6 MB/s
+  small (msg_len=5.5k)            23.89 µs  232.5 MB/s
+  ```
+- tree traversal optimized
+  ```
+  large (msg_len=70.5k)           168.1 µs  419.6 MB/s
+  medium (msg_len=22.5k)          25.79 µs  873.9 MB/s
+  small (msg_len=5.5k)            7.399 µs  750.9 MB/s
+  ```
 - single symbol table lookup
 - multiple symbol table lookup
 - single symbol SIMD processing
@@ -173,10 +184,47 @@ require specific encoding or embeddings are also not useful.
 
 ### Tree Traversal
 
-#### Original
-
-This approach:
+#### Baseline
+```
+message_decoding_nested_baseline
+├─ large (msg_len=70.5k)           318 µs    
+│                                  221.8 MB/s
+├─ large_medium (msg_len=33.3k)    145.2 µs  
+│                                  229.3 MB/s
+├─ medium (msg_len=22.5k)          93.29 µs  
+│                                  241.6 MB/s
+├─ medium_small (msg_len=11.1k)    38.69 µs  
+│                                  288.6 MB/s
+├─ small (msg_len=5.5k)            23.89 µs  
+│                                  232.5 MB/s
+╰─ small_min (msg_len=40b)         105.2 ns  
+                                   380 MB/s  
+```
 
 - uses fully safe code
 - iterates over a BitVec while traversing a tree of nested nodes
+- has no need for prefix codes
+
+#### Optimized
+```
+message_decoding_nested_optimized
+├─ large (msg_len=70.5k)           168.1 µs  
+│                                  419.6 MB/s
+├─ large_medium (msg_len=33.3k)    58.59 µs  
+│                                  568.7 MB/s
+├─ medium (msg_len=22.5k)          25.79 µs  
+│                                  873.9 MB/s
+├─ medium_small (msg_len=11.1k)    12.49 µs  
+│                                  893.7 MB/s
+├─ small (msg_len=5.5k)            7.399 µs  
+│                                  750.9 MB/s
+╰─ small_min (msg_len=40b)         60.71 ns  
+                                   658.7 MB/s
+```
+
+- removes BitVec
+- reads 1 source byte at a time and consumes 1 bit at a time
+- uses `get_unchecked` and `unwrap_unchecked` for reading and traversal
+- uses direct mut_ptr symbol assignment to decoded message buffer
+- converts decoded message buffer to a String without allocation or copying
 - has no need for prefix codes
