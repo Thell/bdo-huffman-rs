@@ -9,7 +9,7 @@ endpoints.
 
 A few different approaches of decoding the Huffman message will be explored.
 
-- tree traversal
+- tree traversal: both original and optimized (uses unsafe)
 - single symbol table lookup
 - multiple symbol table lookup
 - single symbol SIMD processing
@@ -162,7 +162,7 @@ it is directly tied to it.
 https://docs.google.com/spreadsheets/d/1LFri67Eb2nW8VmoG7FGNXIhGAexqGxdZnNQqvzCm-dw
 ) for categorized data to analyze.)_
 
-## Decoders
+## Approaches
 
 In the world of data compression the message sizes are miniscule. This means
 many of the algorithms and optimizations used in decompression libraries are not
@@ -170,3 +170,13 @@ beneficial since any overhead in the preparation of the decoding would have a
 difficult time being amortized away before decoding is completed. Also, since
 the symbols are dynamic and the encoding scheme is set any optimizations that
 require specific encoding or embeddings are also not useful.
+
+### Tree Traversal
+
+#### Original
+
+This approach:
+
+- uses fully safe code
+- iterates over a BitVec while traversing a tree of nested nodes
+- has no need for prefix codes

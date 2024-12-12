@@ -14,7 +14,7 @@ impl Case {
     pub fn request(&self) -> Vec<u8> {
         let filepath = env!("CARGO_MANIFEST_DIR");
         let filepath = format!(
-            "{}/test_data/GetWorldMarketList_{}_{}.bin",
+            "{}/sample_data/GetWorldMarketList_{}_{}.bin",
             filepath, self.main_category, self.sub_category
         );
         let filename = std::path::Path::new(&filepath);
