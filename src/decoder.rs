@@ -221,6 +221,144 @@ pub fn decode_message_with_table(packet: &Packet, table: &Vec<ExtendedPrefix>) -
     }
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////
+// SIMD Table Flat Node Traversal
+pub fn decode_packet_simd_table(content: &[u8]) -> String {
+    let packet = Packet::new(content);
+    let symbol_table = packet.symbol_table();
+    let tree = packet.flat_tree(&symbol_table);
+    let prefixes = packet.extended_prefixes(&tree);
+    decode_message_simd_table(&packet, &prefixes)
+}
+
+pub fn decode_message_simd_table(packet: &Packet, table: &Vec<ExtendedPrefix>) -> String {
+    // let mut result = String::new();
+    let decoded_len = packet.decoded_bytes_len as usize;
+    let mut decoded: Vec<u8> = Vec::with_capacity(decoded_len);
+
+    let mut write_index = 0;
+    let encoded_bits = &packet.encoded_message;
+
+    let mut bit_pos = 0;
+
+    'outer: while bit_pos < encoded_bits.len() * 8 {
+        // Prepare SIMD bits
+        let mut simd_data = [0u8; 32];
+        for i in 0..32 {
+            let byte_index = (bit_pos + i) / 8;
+            let bit_offset = (bit_pos + i) % 8;
+
+            if byte_index < encoded_bits.len() {
+                let mut value = unsafe { encoded_bits.get_unchecked(byte_index) << bit_offset };
+
+                // Only add bits from the next byte if `bit_offset > 0`
+                if bit_offset > 0 && byte_index + 1 < encoded_bits.len() {
+                    value |= unsafe {
+                        ((*encoded_bits.get_unchecked(byte_index + 1) as u16) >> (8 - bit_offset))
+                            as u8
+                    };
+                }
+
+                unsafe { *simd_data.get_unchecked_mut(i) = (value & 0xFF) as u8 };
+            // Keep only the lower 8 bits
+            } else {
+                unsafe { *simd_data.get_unchecked_mut(i) = 0 }; // Zero-fill for out-of-bounds
+            }
+        }
+
+        // Load the data into an SIMD register using intrinsics
+        let simd_vec =
+            unsafe { std::arch::x86_64::_mm256_loadu_si256(simd_data.as_ptr() as *const _) };
+
+        // Extract the indices from the SIMD register
+        let mut indices = [0u8; 32];
+        unsafe { std::arch::x86_64::_mm256_storeu_si256(indices.as_mut_ptr() as *mut _, simd_vec) };
+
+        // Perform table lookups and result writes
+        let mut local_bit_pos = 0;
+        let mut current_lane = 0;
+        while current_lane < 32 {
+            let index = unsafe { *indices.get_unchecked(current_lane as usize) as usize };
+            let extended_prefix = unsafe { table.get_unchecked(index) };
+            let symbols = &extended_prefix.symbols;
+
+            unsafe {
+                // result.extend_from_slice(&symbols);
+                *decoded.as_mut_ptr().add(write_index) = *symbols.get_unchecked(0);
+                write_index += 1;
+                if write_index == decoded_len {
+                    break 'outer;
+                }
+
+                if symbols.len() > 1 {
+                    *decoded.as_mut_ptr().add(write_index) = *symbols.get_unchecked(1);
+                    write_index += 1;
+                    if write_index == decoded_len {
+                        break 'outer;
+                    }
+                }
+                if symbols.len() > 2 {
+                    *decoded.as_mut_ptr().add(write_index) = *symbols.get_unchecked(2);
+                    write_index += 1;
+                    if write_index == decoded_len {
+                        break 'outer;
+                    }
+                }
+                if symbols.len() > 3 {
+                    *decoded.as_mut_ptr().add(write_index) = *symbols.get_unchecked(3);
+                    write_index += 1;
+                    if write_index == decoded_len {
+                        break 'outer;
+                    }
+                }
+                if symbols.len() > 4 {
+                    *decoded.as_mut_ptr().add(write_index) = *symbols.get_unchecked(4);
+                    write_index += 1;
+                    if write_index == decoded_len {
+                        break 'outer;
+                    }
+                }
+                if symbols.len() > 5 {
+                    *decoded.as_mut_ptr().add(write_index) = *symbols.get_unchecked(5);
+                    write_index += 1;
+                    if write_index == decoded_len {
+                        break 'outer;
+                    }
+                }
+                if symbols.len() > 6 {
+                    *decoded.as_mut_ptr().add(write_index) = *symbols.get_unchecked(6);
+                    write_index += 1;
+                    if write_index == decoded_len {
+                        break 'outer;
+                    }
+                }
+                if symbols.len() > 7 {
+                    *decoded.as_mut_ptr().add(write_index) = *symbols.get_unchecked(7);
+                    write_index += 1;
+                    if write_index == decoded_len {
+                        break 'outer;
+                    }
+                }
+            }
+
+            let bits_to_advance = extended_prefix.used_bits as usize;
+            current_lane += bits_to_advance;
+            local_bit_pos += bits_to_advance;
+
+            if current_lane >= 32 {
+                break;
+            }
+        }
+        bit_pos += local_bit_pos;
+    }
+
+    unsafe {
+        decoded.set_len(write_index);
+        let slice = std::slice::from_raw_parts(decoded.as_ptr(), decoded.len());
+        std::str::from_utf8_unchecked(slice).to_owned()
+    }
+}
+
 // MARK: Unit Tests
 
 #[cfg(test)]
@@ -285,6 +423,27 @@ mod tests {
         let prefix_table = packet.extended_prefixes(tree);
         println!("{:?}", prefix_table);
         let decoded_message = decode_message_with_table(&packet, &prefix_table);
+        assert_eq!(decoded_message, EXPECTED_MESSAGE);
+    }
+
+    #[test]
+    fn processes_packet_with_table_simd() {
+        // Tests the integrity of the full processing flow.
+        let decoded_message = decode_packet_simd_table(&TEST_BYTES);
+        assert_eq!(decoded_message, EXPECTED_MESSAGE);
+    }
+
+    #[test]
+    fn decodes_message_with_table_simd() {
+        // Tests only the decoding algo.
+        let packet = Packet::new(&TEST_BYTES);
+        let tree = &packet.flat_tree(&EXPECTED_SYMBOL_TABLE);
+        let prefixes = packet.prefixes_from_flatnode(tree);
+        for prefix in prefixes {
+            println!("{:?}", prefix);
+        }
+        let prefix_table = packet.extended_prefixes(tree);
+        let decoded_message = decode_message_simd_table(&packet, &prefix_table);
         assert_eq!(decoded_message, EXPECTED_MESSAGE);
     }
 }
@@ -379,6 +538,32 @@ mod benches {
             .counter(BytesCount::from(packet.decoded_bytes_len))
             .bench_local(move || {
                 decode_message_with_table(black_box(&packet), prefix_table);
+            });
+    }
+
+    #[divan::bench(args = ALL_CASES)]
+    fn packet_decoding_with_table_simd(bencher: Bencher, case: &Case) {
+        let response_bytes = &case.request();
+
+        bencher
+            .counter(ItemsCount::from(1usize))
+            .bench_local(move || {
+                black_box(decode_packet_simd_table(black_box(response_bytes)));
+            });
+    }
+
+    #[divan::bench(args = ALL_CASES)]
+    fn message_decoding_with_table_simd(bencher: Bencher, case: &Case) {
+        // Tests only the decoding algo.
+        let response_bytes = &case.request();
+        let packet = Packet::new(response_bytes);
+        let tree = &packet.flat_tree(&packet.symbol_table());
+        let prefix_table = &packet.extended_prefixes(tree);
+
+        bencher
+            .counter(BytesCount::from(packet.decoded_bytes_len))
+            .bench_local(move || {
+                decode_message_simd_table(black_box(&packet), prefix_table);
             });
     }
 }
