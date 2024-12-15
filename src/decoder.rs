@@ -443,7 +443,7 @@ mod tests {
     #[test]
     fn all_samples_baseline_vs_table() {
         for case in SAMPLE_CASES {
-            println!("case: {}_{}", case.main_category, case.sub_category);
+            println!("case: {}", case.name);
             let content = &case.request();
             let base_result = decode_packet_nested_baseline(&content);
             let table_result = decode_packet_with_table(&content);
@@ -475,7 +475,7 @@ mod tests {
     #[test]
     fn all_samples_baseline_vs_simd() {
         for case in SAMPLE_CASES {
-            println!("case: {}_{}", case.main_category, case.sub_category);
+            println!("case: {}", case.name);
             let content = &case.request();
             let base_result = decode_packet_nested_baseline(&content);
             let simd_result = decode_packet_simd_table(&content);
