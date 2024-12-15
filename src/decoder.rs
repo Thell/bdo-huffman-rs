@@ -138,8 +138,11 @@ pub fn decode_message_with_table(packet: &Packet, table: &Vec<ExtendedPrefix>) -
     let mut bit_buf_remaining = 0;
     let mut read_index = 0usize;
     let mut write_index = 0usize;
+    let mut prefix_used_bits = 0;
 
     loop {
+        bit_buf_remaining -= prefix_used_bits;
+
         if bit_buf_remaining < 8 && read_index < packet.encoded_message.len() {
             let incoming_bits = packet.encoded_message[read_index] as u16;
             bit_buf |= incoming_bits << (8 - bit_buf_remaining);
@@ -152,9 +155,9 @@ pub fn decode_message_with_table(packet: &Packet, table: &Vec<ExtendedPrefix>) -
         unsafe {
             let extended_prefix = table.get_unchecked(index);
             let symbols = &extended_prefix.symbols;
+            prefix_used_bits = extended_prefix.used_bits;
 
             bit_buf <<= extended_prefix.used_bits;
-            bit_buf_remaining -= extended_prefix.used_bits;
 
             *decoded.as_mut_ptr().add(write_index) = *symbols.get_unchecked(0);
             write_index += 1;
@@ -435,6 +438,17 @@ mod tests {
         println!("{:?}", prefix_table);
         let decoded_message = decode_message_with_table(&packet, &prefix_table);
         assert_eq!(decoded_message, EXPECTED_MESSAGE);
+    }
+
+    #[test]
+    fn all_samples_baseline_vs_table() {
+        for case in SAMPLE_CASES {
+            println!("case: {}_{}", case.main_category, case.sub_category);
+            let content = &case.request();
+            let base_result = decode_packet_nested_baseline(&content);
+            let table_result = decode_packet_with_table(&content);
+            assert_eq!(base_result, table_result)
+        }
     }
 
     #[test]
