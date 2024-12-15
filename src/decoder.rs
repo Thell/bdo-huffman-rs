@@ -405,6 +405,17 @@ mod tests {
     }
 
     #[test]
+    fn all_samples_baseline_vs_optimized_baseline() {
+        for case in SAMPLE_CASES {
+            println!("case: {}_{}", case.main_category, case.sub_category);
+            let content = &case.request();
+            let base_result = decode_packet_nested_baseline(&content);
+            let optimized_result = decode_packet_nested_optimized(&content);
+            assert_eq!(base_result, optimized_result)
+        }
+    }
+
+    #[test]
     fn processes_packet_with_table() {
         // Tests the integrity of the full processing flow.
         let decoded_message = decode_packet_with_table(&TEST_BYTES);
