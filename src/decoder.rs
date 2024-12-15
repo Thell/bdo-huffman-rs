@@ -471,6 +471,17 @@ mod tests {
         let decoded_message = decode_message_simd_table(&packet, &prefix_table);
         assert_eq!(decoded_message, EXPECTED_MESSAGE);
     }
+
+    #[test]
+    fn all_samples_baseline_vs_simd() {
+        for case in SAMPLE_CASES {
+            println!("case: {}_{}", case.main_category, case.sub_category);
+            let content = &case.request();
+            let base_result = decode_packet_nested_baseline(&content);
+            let simd_result = decode_packet_simd_table(&content);
+            assert_eq!(base_result, simd_result)
+        }
+    }
 }
 
 // MARK: Benches
