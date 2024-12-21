@@ -8,6 +8,7 @@ debug = 1
 
 [dependencies]
 bit-vec = "0.8.0"
+bitter = "0.7.1"
 divan = "0.1.17"
 mimalloc = "0.1.43"
 nohash-hasher = "0.2.0"

@@ -2,6 +2,7 @@ use crate::node::FlatNode;
 use crate::{node::TreeNode, packet::Packet};
 
 use bit_vec::BitVec;
+use bitter::{BigEndianReader, BitReader};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // Tree Traversal - Baseline
@@ -145,6 +146,149 @@ pub fn flatnode_decode_message_traverse(packet: &Packet, tree: &[FlatNode]) -> S
     }
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////
+// Table Lookup - PrefixTable
+pub fn flatnode_decode_packet_prefix_table(content: &[u8]) -> String {
+    let packet = Packet::new(content);
+    let flat_tree = packet.flatnode_tree();
+    let extended_prefix_entries = packet.flatnode_prefix_table(&flat_tree);
+    flatnode_decode_message_prefix_table(&packet, &extended_prefix_entries)
+}
+
+pub fn flatnode_decode_message_prefix_table(
+    packet: &Packet,
+    table: &crate::packet::PrefixTable,
+) -> String {
+    let decoded_len = packet.decoded_bytes_len as usize;
+    let mut decoded: Vec<u8> = Vec::with_capacity(decoded_len + 8);
+    let mut write_index = 0usize;
+
+    let mut bits = BigEndianReader::new(packet.encoded_message);
+
+    // Bitter lookahead is 56bits so we process 7 indices per iteration.
+    // This does not consume all bits in lookahead on each iteration.
+    while bits.unbuffered_bytes_remaining() > 7 {
+        // Manually unroll the loop for performance. Approximately 12% speedup.
+        unsafe {
+            bits.refill_lookahead_unchecked();
+            lookup_unchecked_prefix_table(&mut bits, table, &mut write_index, &mut decoded);
+            lookup_unchecked_prefix_table(&mut bits, table, &mut write_index, &mut decoded);
+            lookup_unchecked_prefix_table(&mut bits, table, &mut write_index, &mut decoded);
+            lookup_unchecked_prefix_table(&mut bits, table, &mut write_index, &mut decoded);
+            lookup_unchecked_prefix_table(&mut bits, table, &mut write_index, &mut decoded);
+            lookup_unchecked_prefix_table(&mut bits, table, &mut write_index, &mut decoded);
+            lookup_unchecked_prefix_table(&mut bits, table, &mut write_index, &mut decoded);
+        }
+    }
+
+    // Drain unbuffered bytes with safe refill.
+    while bits.unbuffered_bytes_remaining() > 0 {
+        bits.refill_lookahead();
+        unsafe { lookup_unchecked_prefix_table(&mut bits, table, &mut write_index, &mut decoded) };
+    }
+
+    // Drain lookahead without refill or additional checks until we reach the last byte.
+    while bits.has_bits_remaining(8) {
+        unsafe {
+            lookup_unchecked_prefix_table(&mut bits, table, &mut write_index, &mut decoded);
+        }
+    }
+
+    // Drain partial byte bits with additional checks.
+    while bits.has_bits_remaining(1) {
+        unsafe {
+            lookup_prefix_table(&mut bits, table, &mut write_index, &mut decoded);
+        }
+    }
+
+    // Since we didn't do write_index checks on every iteration we truncate the tail once.
+    unsafe {
+        decoded.set_len(write_index);
+        let slice = std::slice::from_raw_parts(decoded.as_ptr(), decoded.len());
+        let mut decoded = std::str::from_utf8_unchecked(slice).to_owned();
+        decoded.truncate(decoded_len);
+        decoded
+    }
+}
+
+#[inline(always)]
+unsafe fn lookup_unchecked_prefix_table(
+    bits: &mut BigEndianReader,
+    table: &crate::packet::PrefixTable,
+    write_index: &mut usize,
+    decoded: &mut [u8],
+) {
+    let index = bits.peek(8) as usize;
+
+    let symbols = table.symbols.get_unchecked(index);
+    let len = *table.lens.get_unchecked(index);
+    let used_bits = *table.bits_used.get_unchecked(index);
+
+    bits.consume(used_bits as u32);
+    get_symbols_unchecked(symbols, len as usize, write_index, decoded);
+}
+
+#[inline(always)]
+unsafe fn lookup_prefix_table(
+    bits: &mut BigEndianReader,
+    table: &crate::packet::PrefixTable,
+    write_index: &mut usize,
+    decoded: &mut [u8],
+) {
+    let lookahead_count = bits.lookahead_bits().min(8);
+    let last_bits = bits.peek(lookahead_count);
+    let index = (last_bits << (8 - lookahead_count)) as usize;
+
+    let symbols = table.symbols.get_unchecked(index);
+    let len = *table.lens.get_unchecked(index) as usize;
+    let used_bits = *table.bits_used.get_unchecked(index);
+    let bits_to_consume = lookahead_count.min(used_bits as u32);
+
+    bits.consume(bits_to_consume);
+    get_symbols_unchecked(symbols, len, write_index, decoded);
+}
+
+#[inline(always)]
+unsafe fn get_symbols_unchecked(
+    symbols: &[u8],
+    len: usize,
+    write_index: &mut usize,
+    decoded: &mut [u8],
+) {
+    // Manually unroll the loop for performance. Approximately 50% speedup.
+    *decoded.as_mut_ptr().add(*write_index) = *symbols.get_unchecked(0);
+    *write_index += 1;
+
+    if len > 1 {
+        *decoded.as_mut_ptr().add(*write_index) = *symbols.get_unchecked(1);
+        *write_index += 1;
+    }
+    if len > 2 {
+        *decoded.as_mut_ptr().add(*write_index) = *symbols.get_unchecked(2);
+        *write_index += 1;
+    }
+    if len > 3 {
+        *decoded.as_mut_ptr().add(*write_index) = *symbols.get_unchecked(3);
+        *write_index += 1;
+    }
+    if len > 4 {
+        *decoded.as_mut_ptr().add(*write_index) = *symbols.get_unchecked(4);
+        *write_index += 1;
+    }
+    if len > 5 {
+        *decoded.as_mut_ptr().add(*write_index) = *symbols.get_unchecked(5);
+        *write_index += 1;
+    }
+    if len > 6 {
+        *decoded.as_mut_ptr().add(*write_index) = *symbols.get_unchecked(6);
+        *write_index += 1;
+    }
+    if len > 7 {
+        *decoded.as_mut_ptr().add(*write_index) = *symbols.get_unchecked(7);
+        *write_index += 1;
+    }
+}
+
 // =========================================================
 // MARK: Unit Tests
 
@@ -216,6 +360,32 @@ mod tests {
             assert_eq!(result, expected_result)
         }
     }
+
+    #[test]
+    fn flatnode_decode_packet_prefix_table() {
+        let decoded_message = super::flatnode_decode_packet_prefix_table(&TEST_BYTES);
+        assert_eq!(decoded_message, EXPECTED_MESSAGE);
+    }
+
+    #[test]
+    fn flatnode_decode_message_prefix_table() {
+        let packet = Packet::new(&TEST_BYTES);
+        let tree = packet.flatnode_tree();
+        let table = packet.flatnode_prefix_table(&tree);
+        let decoded_message = super::flatnode_decode_message_prefix_table(&packet, &table);
+        assert_eq!(decoded_message, EXPECTED_MESSAGE);
+    }
+
+    #[test]
+    fn all_samples_baseline_to_prefix_table() {
+        for case in SAMPLE_CASES.iter().rev() {
+            println!("case: {}_{}", case.main_category, case.sub_category);
+            let content = case.request();
+            let expected_result = super::treenode_decode_packet_traverse(&content);
+            let result = super::flatnode_decode_packet_prefix_table(&content);
+            assert_eq!(result, expected_result)
+        }
+    }
 }
 
 // MARK: Benches
@@ -240,6 +410,7 @@ mod benches_packet {
     bench_decode_packet!(treenode_decode_packet_traverse_baseline);
     bench_decode_packet!(treenode_decode_packet_traverse);
     bench_decode_packet!(flatnode_decode_packet_traverse);
+    bench_decode_packet!(flatnode_decode_packet_prefix_table);
 }
 
 #[divan::bench_group(sample_count = 10_000)]
@@ -266,9 +437,27 @@ mod benches_message {
         };
     }
 
+    macro_rules! bench_decode_message_table {
+        ($name:ident, $table:ident ) => {
+            #[divan::bench(args = ALL_CASES)]
+            fn $name(bencher: Bencher, case: &Case) {
+                let response_bytes = case.request();
+                let packet = Packet::new(&response_bytes);
+                let tree = packet.flatnode_tree();
+                let table = packet.$table(&tree);
+                bencher
+                    .counter(BytesCount::from(packet.decoded_bytes_len))
+                    .bench_local(move || {
+                        super::$name(black_box(&packet), &table);
+                    });
+            }
+        };
+    }
+
     bench_decode_message!(treenode_decode_message_traverse_baseline, treenode_tree);
     bench_decode_message!(treenode_decode_message_traverse, treenode_tree);
     bench_decode_message!(flatnode_decode_message_traverse, flatnode_tree);
+    bench_decode_message_table!(flatnode_decode_message_prefix_table, flatnode_prefix_table);
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////
@@ -296,6 +485,7 @@ mod decode_packet_group_large {
     bench_group_decode_packet!(treenode_decode_packet_traverse_baseline);
     bench_group_decode_packet!(treenode_decode_packet_traverse);
     bench_group_decode_packet!(flatnode_decode_packet_traverse);
+    bench_group_decode_packet!(flatnode_decode_packet_prefix_table);
 }
 
 #[divan::bench_group(sample_count = 100_000)]
@@ -308,6 +498,7 @@ mod decode_packet_group_large_medium {
     bench_group_decode_packet!(treenode_decode_packet_traverse_baseline);
     bench_group_decode_packet!(treenode_decode_packet_traverse);
     bench_group_decode_packet!(flatnode_decode_packet_traverse);
+    bench_group_decode_packet!(flatnode_decode_packet_prefix_table);
 }
 
 #[divan::bench_group(sample_count = 100_000)]
@@ -320,6 +511,7 @@ mod decode_packet_group_medium {
     bench_group_decode_packet!(treenode_decode_packet_traverse_baseline);
     bench_group_decode_packet!(treenode_decode_packet_traverse);
     bench_group_decode_packet!(flatnode_decode_packet_traverse);
+    bench_group_decode_packet!(flatnode_decode_packet_prefix_table);
 }
 
 #[divan::bench_group(sample_count = 100_000)]
@@ -332,6 +524,7 @@ mod decode_packet_group_medium_small {
     bench_group_decode_packet!(treenode_decode_packet_traverse_baseline);
     bench_group_decode_packet!(treenode_decode_packet_traverse);
     bench_group_decode_packet!(flatnode_decode_packet_traverse);
+    bench_group_decode_packet!(flatnode_decode_packet_prefix_table);
 }
 
 #[divan::bench_group(sample_count = 100_000)]
@@ -344,6 +537,7 @@ mod decode_packet_group_small {
     bench_group_decode_packet!(treenode_decode_packet_traverse_baseline);
     bench_group_decode_packet!(treenode_decode_packet_traverse);
     bench_group_decode_packet!(flatnode_decode_packet_traverse);
+    bench_group_decode_packet!(flatnode_decode_packet_prefix_table);
 }
 
 #[divan::bench_group(sample_count = 100_000)]
@@ -356,4 +550,5 @@ mod decode_packet_group_small_min {
     bench_group_decode_packet!(treenode_decode_packet_traverse_baseline);
     bench_group_decode_packet!(treenode_decode_packet_traverse);
     bench_group_decode_packet!(flatnode_decode_packet_traverse);
+    bench_group_decode_packet!(flatnode_decode_packet_prefix_table);
 }
