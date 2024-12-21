@@ -9,17 +9,19 @@ A few different approaches of decoding the Huffman message are explored.
 
 ## Full Packet Processing Results
 
-Includes all steps to parse and decode the incoming packet.
+Average times. Includes all steps to parse and decode the incoming packet.
 
-| Test Message Size | Nested BaseLine | Nested Optimized | Multi-Symbol Table | WIP         | Baseline / 🚀 |
-|:-----------------:|:---------------:|:----------------:|:------------------:|-------------|:-------------:|
-|       70.5k       |    368.4 µs     |     169.9 µs     |      131.6 µs      | 59.99 µs 🚀 |     6.14      |
-|       33.3k       |    170.9 µs     |     60.29 µs     |      46.19 µs      | 28.69 µs 🚀 |     5.96      |
-|       22.5k       |    110.1 µs     |     26.49 µs     |      31.59 µs      | 19.19 µs 🚀 |     5.74      |
-|       11.1k       |    47.99 µs     |     13.29 µs     |      17.29 µs      | 9.999 µs 🚀 |     4.80      |
-|       5.5k        |    31.19 µs     |     8.099 µs     |      11.29 µs      | 5.899 µs 🚀 |     5.29      |
-|        40b        |    693.5 ns     |     587.2 ns     |      3.399 µs      | 299.5 ns 🚀 |     2.32      |
- 
+Baseline uses TreeNode with simple BitVec bit by bit traversal.
+
+| Test Message Size | BaseLine | TreeNode |  FlatNode   |
+|:-----------------:|:--------:|:--------:|:-----------:|
+|       70.5k       | 402.2 µs | 177.8 µs |  176.9 µs   |
+|       33.3k       | 189.2 µs | 62.99 µs |  62.29 µs   |
+|       22.5k       | 124.0 µs | 28.04 µs |  27.26 µs   |
+|       11.1k       | 55.84 µs | 14.14 µs |  13.60 µs   |
+|       5.5k        | 47.26 µs | 8.665 µs |  8.226 µs   |
+|        40b        | 849.2 ns | 746.3 ns | 373.6 ns 🚀 |
+
 _Tested on a Ryzen 5700G_
 
 ## Usage
