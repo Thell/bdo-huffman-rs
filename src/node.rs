@@ -1,5 +1,6 @@
 use crate::min_heap::MinHeapNode;
 
+///////////////////////////////////////////////////////////////////////////////
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct TreeNode {
     pub symbol: Option<u8>,
@@ -11,6 +12,17 @@ pub struct TreeNode {
 impl MinHeapNode for TreeNode {
     fn frequency(&self) -> u32 {
         self.frequency
+    }
+    fn new(symbol: Option<u8>, frequency: u32) -> Self {
+        TreeNode::new(symbol, frequency)
+    }
+    fn new_parent(left: Self, right: Self) -> Self {
+        TreeNode {
+            symbol: None,
+            frequency: left.frequency + right.frequency,
+            left_child: Some(Box::new(left)),
+            right_child: Some(Box::new(right)),
+        }
     }
 }
 
@@ -36,6 +48,7 @@ impl TreeNode {
     }
 }
 
+///////////////////////////////////////////////////////////////////////////////
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct FlatNode {
     pub symbol: Option<u8>,
@@ -47,6 +60,17 @@ pub struct FlatNode {
 impl MinHeapNode for FlatNode {
     fn frequency(&self) -> u32 {
         self.frequency
+    }
+    fn new(symbol: Option<u8>, frequency: u32) -> Self {
+        FlatNode::new(symbol, frequency)
+    }
+    fn new_parent(left: Self, right: Self) -> Self {
+        FlatNode {
+            symbol: None,
+            frequency: left.frequency + right.frequency,
+            left_ptr: &left as *const _,
+            right_ptr: &right as *const _,
+        }
     }
 }
 
@@ -78,6 +102,18 @@ impl FlatNode {
             frequency,
             left_ptr: std::ptr::null(),
             right_ptr: std::ptr::null(),
+        }
+    }
+    pub fn new_parent(
+        frequency: u32,
+        left_ptr: *const FlatNode,
+        right_ptr: *const FlatNode,
+    ) -> Self {
+        Self {
+            symbol: None,
+            frequency,
+            left_ptr,
+            right_ptr,
         }
     }
 }

@@ -2,6 +2,8 @@ pub struct MinHeap<T: MinHeapNode>(Vec<T>);
 
 pub trait MinHeapNode {
     fn frequency(&self) -> u32;
+    fn new(symbol: Option<u8>, frequency: u32) -> Self;
+    fn new_parent(left: Self, right: Self) -> Self;
 }
 
 impl<T: MinHeapNode> Default for MinHeap<T> {
@@ -82,17 +84,32 @@ impl<T: MinHeapNode> MinHeap<T> {
 
 #[cfg(test)]
 mod tests {
-    use crate::node::TreeNode;
+    use crate::node::{FlatNode, TreeNode};
     use crate::test_cases::*;
 
     use super::MinHeap;
 
     #[test]
-    fn pop_order() {
+    fn pop_order_tree() {
         // Tests the integrity of the MinHeap min element ordering.
         let mut heap = MinHeap::<TreeNode>::new();
         for (symbol, frequency) in EXPECTED_SYMBOL_TABLE {
             heap.push(TreeNode::new(Some(symbol), frequency));
+        }
+        let mut pop_order = Vec::<Option<u8>>::new();
+        while !heap.is_empty() {
+            pop_order.push(heap.pop().symbol);
+        }
+        println!("{:?}", pop_order);
+        assert_eq!(pop_order, EXPECTED_POP_ORDER);
+    }
+
+    #[test]
+    fn pop_order_flatnode() {
+        // Tests the integrity of the MinHeap min element ordering.
+        let mut heap = MinHeap::<FlatNode>::new();
+        for (symbol, frequency) in EXPECTED_SYMBOL_TABLE {
+            heap.push(FlatNode::new(Some(symbol), frequency));
         }
         let mut pop_order = Vec::<Option<u8>>::new();
         while !heap.is_empty() {
@@ -106,47 +123,49 @@ mod tests {
 // MARK: Benches
 
 #[divan::bench_group(sample_count = 10_000)]
-mod benches_common {
+mod common {
     use super::*;
-    use crate::node::TreeNode;
-    use crate::packet::Packet;
-    use crate::test_cases::{Case, ALL_CASES};
+    use crate::node::{FlatNode, TreeNode};
+    use crate::test_cases::EXPECTED_SYMBOL_TABLE;
 
-    use divan::counter::BytesCount;
     use divan::{black_box, Bencher};
 
-    #[divan::bench(args = ALL_CASES)]
-    fn heap_push(bencher: Bencher, case: &Case) {
-        let response_bytes = &case.request();
-        let packet = &Packet::new(response_bytes);
-        let symbol_table = &packet.symbol_table();
-
-        bencher
-            .counter(BytesCount::from(symbol_table.len()))
-            .bench_local(move || {
-                let mut heap = MinHeap::new();
-                symbol_table
-                    .iter()
-                    .for_each(|&(s, f)| heap.push(TreeNode::new(Some(s), f)));
-            });
+    #[divan::bench(types = [TreeNode, FlatNode])]
+    fn alloc<T: MinHeapNode>() -> MinHeap<T> {
+        MinHeap::<T>::default()
     }
 
-    #[divan::bench(args = ALL_CASES)]
-    fn heap_pop(bencher: Bencher, case: &Case) {
-        let response_bytes = &case.request();
-        let packet = &Packet::new(response_bytes);
-        let symbol_table = &packet.symbol_table();
-        let mut heap = MinHeap::new();
-        symbol_table
-            .iter()
-            .for_each(|&(s, f)| heap.push(TreeNode::new(Some(s), f)));
+    #[divan::bench(types = [TreeNode, FlatNode])]
+    fn push<T: MinHeapNode>(bencher: Bencher) {
+        let mut heap = MinHeap::<T>::new();
+        bencher.bench_local(move || {
+            EXPECTED_SYMBOL_TABLE
+                .iter()
+                .for_each(|&(s, f)| heap.push(T::new(Some(black_box(s)), f)));
+        });
+    }
 
-        bencher
-            .counter(BytesCount::from(symbol_table.len()))
-            .bench_local(move || {
-                while !heap.is_empty() {
-                    black_box(heap.pop());
-                }
-            });
+    #[divan::bench(types = [TreeNode, FlatNode])]
+    fn pop<T: MinHeapNode>(bencher: Bencher) {
+        let mut heap = MinHeap::<T>::new();
+        EXPECTED_SYMBOL_TABLE
+            .iter()
+            .for_each(|&(s, f)| heap.push(T::new(Some(s), f)));
+        bencher.bench_local(move || {
+            while !heap.is_empty() {
+                black_box(heap.pop());
+            }
+        });
+    }
+
+    #[divan::bench(types = [TreeNode, FlatNode])]
+    fn roundtrip<T: MinHeapNode>() {
+        let mut heap = MinHeap::<T>::new();
+        EXPECTED_SYMBOL_TABLE
+            .iter()
+            .for_each(|&(s, f)| heap.push(T::new(Some(s), f)));
+        while !heap.is_empty() {
+            black_box(heap.pop());
+        }
     }
 }

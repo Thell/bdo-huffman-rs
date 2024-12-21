@@ -1,3 +1,4 @@
+#[derive(Debug, Clone, Copy)]
 pub struct Case {
     pub name: &'static str,
     pub main_category: u32,
