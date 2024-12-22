@@ -22,11 +22,6 @@ Baseline uses TreeNode with simple BitVec bit by bit traversal.
 |       5.5k        | 47.26 µs | 8.665 µs |  8.226 µs   | 6.142 µs 🚀 |     7.69      |
 |        40b        | 849.2 ns | 746.3 ns | 373.6 ns 🚀 |  1.268 µs   |     2.27      |
 
-
-
-
-
-
 _Tested on a Ryzen 5700G_
 
 ## Usage
