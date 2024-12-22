@@ -42,6 +42,48 @@ pub fn treenode_decode_message_traverse_baseline(packet: &Packet, tree: &TreeNod
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
+// Tree Traversal - TreeNode - A fully 100% safe version
+pub fn treenode_decode_packet_traverse_safe(content: &[u8]) -> String {
+    let packet = Packet::new(content);
+    let tree = packet.treenode_tree();
+    treenode_decode_message_traverse_safe(&packet, &tree)
+}
+
+pub fn treenode_decode_message_traverse_safe(packet: &Packet, tree: &TreeNode) -> String {
+    let mut decoded: Vec<u8> = Vec::with_capacity(packet.decoded_bytes_len as usize);
+    let mut current = tree;
+    let mut write_index = 0;
+
+    'outer: for byte in packet.encoded_message.iter() {
+        let mut bits = *byte;
+        for _ in 0..8 {
+            let bit = (bits & 0b1000_0000) != 0;
+            bits <<= 1;
+
+            let child = match bit {
+                true => current.right_child.as_ref().unwrap(),
+                false => current.left_child.as_ref().unwrap(),
+            };
+
+            current = child;
+
+            if let Some(symbol) = current.symbol {
+                decoded.push(symbol);
+                write_index += 1;
+                current = tree;
+
+                if write_index == packet.decoded_bytes_len as usize {
+                    break 'outer;
+                }
+            }
+        }
+    }
+
+    let slice = &decoded[..];
+    std::str::from_utf8(slice).unwrap().to_owned()
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
 // Tree Traversal - TreeNode
 pub fn treenode_decode_packet_traverse(content: &[u8]) -> String {
     let packet = Packet::new(content);
@@ -94,6 +136,47 @@ pub fn treenode_decode_message_traverse(packet: &Packet, tree: &TreeNode) -> Str
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
+// Tree Traversal - FlatNode - A minimally unsafe version
+pub fn flatnode_decode_packet_traverse_safe(content: &[u8]) -> String {
+    let packet = Packet::new(content);
+    let tree = packet.flatnode_tree();
+    flatnode_decode_message_traverse_safe(&packet, &tree)
+}
+
+pub fn flatnode_decode_message_traverse_safe(packet: &Packet, tree: &[FlatNode]) -> String {
+    let mut decoded: Vec<u8> = Vec::with_capacity(packet.decoded_bytes_len as usize);
+    let root = &tree[0];
+    let mut node = root;
+    let mut write_index = 0;
+
+    'outer: for byte in packet.encoded_message.iter() {
+        let mut bits = *byte;
+
+        for _ in 0..8 {
+            let direction = (bits & 0b1000_0000) != 0;
+            node = match direction {
+                // use unsafe to unwrap the const pointers
+                true => unsafe { &*node.right_ptr },
+                false => unsafe { &*node.left_ptr },
+            };
+
+            if let Some(symbol) = node.symbol {
+                decoded.push(symbol);
+                write_index += 1;
+                if write_index == packet.decoded_bytes_len as usize {
+                    break 'outer;
+                }
+                node = root;
+            }
+            bits <<= 1;
+        }
+    }
+
+    let slice = &decoded[..];
+    std::str::from_utf8(slice).unwrap().to_owned()
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
 // Tree Traversal - FlatNode
 pub fn flatnode_decode_packet_traverse(content: &[u8]) -> String {
     let packet = Packet::new(content);
@@ -123,19 +206,17 @@ pub fn flatnode_decode_message_traverse(packet: &Packet, tree: &[FlatNode]) -> S
                 .as_ref()
                 .unwrap_unchecked()
             };
-            bits <<= 1;
-
             if let Some(symbol) = node.symbol {
                 unsafe {
                     *decoded.as_mut_ptr().add(write_index) = symbol;
                 }
                 write_index += 1;
-                node = root;
-
                 if write_index == packet.decoded_bytes_len as usize {
                     break 'outer;
                 }
+                node = root;
             }
+            bits <<= 1;
         }
     }
 
@@ -302,6 +383,12 @@ mod tests {
     }
 
     #[test]
+    fn treenode_decode_packet_traverse_safe() {
+        let decoded_message = super::treenode_decode_packet_traverse_safe(&TEST_BYTES);
+        assert_eq!(decoded_message, EXPECTED_MESSAGE);
+    }
+
+    #[test]
     fn treenode_decode_packet_traverse() {
         let decoded_message = super::treenode_decode_packet_traverse(&TEST_BYTES);
         assert_eq!(decoded_message, EXPECTED_MESSAGE);
@@ -324,6 +411,12 @@ mod tests {
             let result = super::treenode_decode_packet_traverse(&content);
             assert_eq!(result, expected_result)
         }
+    }
+
+    #[test]
+    fn flatnode_decode_packet_traverse_safe() {
+        let decoded_message = super::flatnode_decode_packet_traverse_safe(&TEST_BYTES);
+        assert_eq!(decoded_message, EXPECTED_MESSAGE);
     }
 
     #[test]
@@ -380,7 +473,7 @@ mod tests {
 
 // MARK: Benches
 
-#[divan::bench_group(sample_count = 100_000)]
+#[divan::bench_group(sample_count = 10_000)]
 mod benches_packet {
     use crate::test_cases::*;
     use divan::{black_box, Bencher};
@@ -398,6 +491,8 @@ mod benches_packet {
     }
 
     bench_decode_packet!(treenode_decode_packet_traverse_baseline);
+    bench_decode_packet!(treenode_decode_packet_traverse_safe);
+    bench_decode_packet!(flatnode_decode_packet_traverse_safe);
     bench_decode_packet!(treenode_decode_packet_traverse);
     bench_decode_packet!(flatnode_decode_packet_traverse);
     bench_decode_packet!(flatnode_decode_packet_prefix_table);
@@ -445,6 +540,8 @@ mod benches_message {
     }
 
     bench_decode_message!(treenode_decode_message_traverse_baseline, treenode_tree);
+    bench_decode_message!(treenode_decode_message_traverse_safe, treenode_tree);
+    bench_decode_message!(flatnode_decode_message_traverse_safe, flatnode_tree);
     bench_decode_message!(treenode_decode_message_traverse, treenode_tree);
     bench_decode_message!(flatnode_decode_message_traverse, flatnode_tree);
     bench_decode_message_table!(flatnode_decode_message_prefix_table, flatnode_prefix_table);
@@ -466,19 +563,21 @@ macro_rules! bench_group_decode_packet {
     };
 }
 
-#[divan::bench_group(sample_count = 100_000)]
+#[divan::bench_group(sample_count = 10_000)]
 mod decode_packet_group_large {
     use crate::test_cases::*;
     use divan::{black_box, Bencher};
 
     static CASE: &Case = &ALL_CASES[0];
     bench_group_decode_packet!(treenode_decode_packet_traverse_baseline);
+    bench_group_decode_packet!(treenode_decode_packet_traverse_safe);
+    bench_group_decode_packet!(flatnode_decode_packet_traverse_safe);
     bench_group_decode_packet!(treenode_decode_packet_traverse);
     bench_group_decode_packet!(flatnode_decode_packet_traverse);
     bench_group_decode_packet!(flatnode_decode_packet_prefix_table);
 }
 
-#[divan::bench_group(sample_count = 100_000)]
+#[divan::bench_group(sample_count = 10_000)]
 mod decode_packet_group_large_medium {
     use crate::test_cases::*;
     use divan::{black_box, Bencher};
@@ -486,12 +585,14 @@ mod decode_packet_group_large_medium {
     static CASE: &Case = &ALL_CASES[1];
 
     bench_group_decode_packet!(treenode_decode_packet_traverse_baseline);
+    bench_group_decode_packet!(treenode_decode_packet_traverse_safe);
+    bench_group_decode_packet!(flatnode_decode_packet_traverse_safe);
     bench_group_decode_packet!(treenode_decode_packet_traverse);
     bench_group_decode_packet!(flatnode_decode_packet_traverse);
     bench_group_decode_packet!(flatnode_decode_packet_prefix_table);
 }
 
-#[divan::bench_group(sample_count = 100_000)]
+#[divan::bench_group(sample_count = 10_000)]
 mod decode_packet_group_medium {
     use crate::test_cases::*;
     use divan::{black_box, Bencher};
@@ -499,12 +600,14 @@ mod decode_packet_group_medium {
     static CASE: &Case = &ALL_CASES[2];
 
     bench_group_decode_packet!(treenode_decode_packet_traverse_baseline);
+    bench_group_decode_packet!(treenode_decode_packet_traverse_safe);
+    bench_group_decode_packet!(flatnode_decode_packet_traverse_safe);
     bench_group_decode_packet!(treenode_decode_packet_traverse);
     bench_group_decode_packet!(flatnode_decode_packet_traverse);
     bench_group_decode_packet!(flatnode_decode_packet_prefix_table);
 }
 
-#[divan::bench_group(sample_count = 100_000)]
+#[divan::bench_group(sample_count = 10_000)]
 mod decode_packet_group_medium_small {
     use crate::test_cases::*;
     use divan::{black_box, Bencher};
@@ -512,12 +615,14 @@ mod decode_packet_group_medium_small {
     static CASE: &Case = &ALL_CASES[3];
 
     bench_group_decode_packet!(treenode_decode_packet_traverse_baseline);
+    bench_group_decode_packet!(treenode_decode_packet_traverse_safe);
+    bench_group_decode_packet!(flatnode_decode_packet_traverse_safe);
     bench_group_decode_packet!(treenode_decode_packet_traverse);
     bench_group_decode_packet!(flatnode_decode_packet_traverse);
     bench_group_decode_packet!(flatnode_decode_packet_prefix_table);
 }
 
-#[divan::bench_group(sample_count = 100_000)]
+#[divan::bench_group(sample_count = 10_000)]
 mod decode_packet_group_small {
     use crate::test_cases::*;
     use divan::{black_box, Bencher};
@@ -525,12 +630,14 @@ mod decode_packet_group_small {
     static CASE: &Case = &ALL_CASES[4];
 
     bench_group_decode_packet!(treenode_decode_packet_traverse_baseline);
+    bench_group_decode_packet!(treenode_decode_packet_traverse_safe);
+    bench_group_decode_packet!(flatnode_decode_packet_traverse_safe);
     bench_group_decode_packet!(treenode_decode_packet_traverse);
     bench_group_decode_packet!(flatnode_decode_packet_traverse);
     bench_group_decode_packet!(flatnode_decode_packet_prefix_table);
 }
 
-#[divan::bench_group(sample_count = 100_000)]
+#[divan::bench_group(sample_count = 10_000)]
 mod decode_packet_group_small_min {
     use crate::test_cases::*;
     use divan::{black_box, Bencher};
@@ -538,6 +645,8 @@ mod decode_packet_group_small_min {
     static CASE: &Case = &ALL_CASES[5];
 
     bench_group_decode_packet!(treenode_decode_packet_traverse_baseline);
+    bench_group_decode_packet!(treenode_decode_packet_traverse_safe);
+    bench_group_decode_packet!(flatnode_decode_packet_traverse_safe);
     bench_group_decode_packet!(treenode_decode_packet_traverse);
     bench_group_decode_packet!(flatnode_decode_packet_traverse);
     bench_group_decode_packet!(flatnode_decode_packet_prefix_table);
