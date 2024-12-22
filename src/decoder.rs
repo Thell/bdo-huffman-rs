@@ -149,10 +149,10 @@ pub fn flatnode_decode_message_traverse(packet: &Packet, tree: &[FlatNode]) -> S
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // Table Lookup - PrefixTable
 pub fn flatnode_decode_packet_prefix_table(content: &[u8]) -> String {
-    let packet = Packet::new(content);
-    let flat_tree = packet.flatnode_tree();
-    let extended_prefix_entries = packet.flatnode_prefix_table(&flat_tree);
-    flatnode_decode_message_prefix_table(&packet, &extended_prefix_entries)
+    let packet = &Packet::new(content);
+    let flat_tree = &packet.flatnode_tree();
+    let extended_prefix_entries = &packet.flatnode_prefix_table(flat_tree);
+    flatnode_decode_message_prefix_table(packet, extended_prefix_entries)
 }
 
 pub fn flatnode_decode_message_prefix_table(
@@ -165,7 +165,8 @@ pub fn flatnode_decode_message_prefix_table(
 
     let mut bits = BigEndianReader::new(packet.encoded_message);
 
-    // Bitter lookahead is 56bits so we process 7 indices per iteration.
+    // Lookahead is 56bits
+    // Consume unbuffered bytes by processing 7 8-bit indices per iteration.
     // This does not consume all bits in lookahead on each iteration.
     while bits.unbuffered_bytes_remaining() > 7 {
         // Manually unroll the loop for performance. Approximately 12% speedup.
@@ -187,21 +188,17 @@ pub fn flatnode_decode_message_prefix_table(
         unsafe { lookup_unchecked_prefix_table(&mut bits, table, &mut write_index, &mut decoded) };
     }
 
-    // Drain lookahead without refill or additional checks until we reach the last byte.
+    // Consume lookahead without refill or peek checks until the last byte.
     while bits.has_bits_remaining(8) {
-        unsafe {
-            lookup_unchecked_prefix_table(&mut bits, table, &mut write_index, &mut decoded);
-        }
+        unsafe { lookup_unchecked_prefix_table(&mut bits, table, &mut write_index, &mut decoded) }
     }
 
-    // Drain partial byte bits with additional checks.
+    // Drain partial byte bits with peek checks.
     while bits.has_bits_remaining(1) {
-        unsafe {
-            lookup_prefix_table(&mut bits, table, &mut write_index, &mut decoded);
-        }
+        unsafe { lookup_prefix_table(&mut bits, table, &mut write_index, &mut decoded) }
     }
 
-    // Since we didn't do write_index checks on every iteration we truncate the tail once.
+    // Truncate decoded since write_index wasn't while draining lookahead.
     unsafe {
         decoded.set_len(write_index);
         let slice = std::slice::from_raw_parts(decoded.as_ptr(), decoded.len());
@@ -224,8 +221,8 @@ unsafe fn lookup_unchecked_prefix_table(
     let len = *table.lens.get_unchecked(index);
     let used_bits = *table.bits_used.get_unchecked(index);
 
-    bits.consume(used_bits as u32);
     get_symbols_unchecked(symbols, len as usize, write_index, decoded);
+    bits.consume(used_bits as u32);
 }
 
 #[inline(always)]
@@ -242,10 +239,11 @@ unsafe fn lookup_prefix_table(
     let symbols = table.symbols.get_unchecked(index);
     let len = *table.lens.get_unchecked(index) as usize;
     let used_bits = *table.bits_used.get_unchecked(index);
-    let bits_to_consume = lookahead_count.min(used_bits as u32);
 
-    bits.consume(bits_to_consume);
     get_symbols_unchecked(symbols, len, write_index, decoded);
+
+    let bits_to_consume = lookahead_count.min(used_bits as u32);
+    bits.consume(bits_to_consume);
 }
 
 #[inline(always)]
@@ -277,14 +275,6 @@ unsafe fn get_symbols_unchecked(
     }
     if len > 5 {
         *decoded.as_mut_ptr().add(*write_index) = *symbols.get_unchecked(5);
-        *write_index += 1;
-    }
-    if len > 6 {
-        *decoded.as_mut_ptr().add(*write_index) = *symbols.get_unchecked(6);
-        *write_index += 1;
-    }
-    if len > 7 {
-        *decoded.as_mut_ptr().add(*write_index) = *symbols.get_unchecked(7);
         *write_index += 1;
     }
 }

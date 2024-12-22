@@ -11,10 +11,11 @@ pub(crate) type PrefixMap = HashMap<u8, String, BuildHasherDefault<NoHashHasher<
 pub(crate) const MAX_SYMBOLS: usize = 12; // digits 0-9, '|' and '-'
 
 // Extended prefixes in flat array layout.
+#[repr(C)]
 pub struct PrefixTable {
-    pub symbols: [[u8; 8]; 256],
-    pub lens: [u8; 256],
     pub bits_used: [u8; 256],
+    pub lens: [u8; 256],
+    pub symbols: [[u8; 6]; 256],
 }
 
 impl Default for PrefixTable {
@@ -26,9 +27,9 @@ impl Default for PrefixTable {
 impl PrefixTable {
     pub fn new() -> Self {
         PrefixTable {
-            symbols: [[0u8; 8]; 256],
-            lens: [0u8; 256],
             bits_used: [0u8; 256],
+            lens: [0u8; 256],
+            symbols: [[0u8; 6]; 256],
         }
     }
 }
@@ -261,6 +262,9 @@ impl Packet<'_> {
                         *symbols_ptr.add(write_index) = symbol;
                         write_index += 1;
                         bits_used = i + 1;
+                        if write_index == 6 {
+                            break;
+                        }
                         node = root;
                     }
                     bits <<= 1;
