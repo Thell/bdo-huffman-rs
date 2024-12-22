@@ -146,39 +146,40 @@ impl Packet<'_> {
         let mut heap = self.symbols_heap::<FlatNode>();
 
         let mut right_index = 2 * self.symbol_count as usize - 1;
-        let mut nodes = vec![FlatNode::default(); right_index];
-        let nodes_ptr = nodes.as_mut_ptr();
+        let mut tree = vec![FlatNode::default(); right_index];
+        let tree_ptr = tree.as_mut_ptr();
         right_index -= 1;
 
         loop {
             // Move two smallest nodes from heap to vec ensuring smallest on the left
-            let smallest = heap.pop();
-            let next_smallest = heap.pop();
-            let parent_freq = smallest.frequency + next_smallest.frequency;
+            let left = heap.pop();
+            let right = heap.pop();
+            let parent_frequency = left.frequency + right.frequency;
 
+            // Add children to the tree vec
             unsafe {
-                *nodes_ptr.add(right_index - 1) = smallest;
-                *nodes_ptr.add(right_index) = next_smallest;
+                *tree_ptr.add(right_index - 1) = left;
+                *tree_ptr.add(right_index) = right;
             }
 
             // Add parent node to the heap for ordering
             heap.push(FlatNode::new_parent(
-                parent_freq,
-                unsafe { nodes_ptr.add(right_index - 1) },
-                unsafe { nodes_ptr.add(right_index) },
+                parent_frequency,
+                unsafe { tree_ptr.add(right_index - 1) },
+                unsafe { tree_ptr.add(right_index) },
             ));
 
             right_index -= 2;
             if right_index < 2 {
-                // Move the last node (the root)
+                // Move the last node (the root) to the tree vec
                 unsafe {
-                    *nodes_ptr = heap.pop();
+                    *tree_ptr = heap.pop();
                 }
                 break;
             }
         }
 
-        nodes
+        tree
     }
 }
 
@@ -226,6 +227,10 @@ impl Packet<'_> {
 
     #[allow(clippy::unnecessary_cast)]
     pub fn flatnode_prefix_table(&self, tree: &[FlatNode]) -> PrefixTable {
+        // Generate a multi-symbol lookup table.
+        // Decodes all 8 step paths through the tree storing each symbol visited,
+        // the number of symbols written, and the number of bits used when the
+        // last symbol was visited.
         let mut prefix_entry = PrefixTable::new();
         let root = unsafe { tree.get_unchecked(0) };
 
@@ -427,6 +432,7 @@ mod flatnode_multi_symbol {
 
     use divan::{black_box, Bencher};
 
+    #[allow(clippy::extra_unused_type_parameters)]
     #[divan::bench(types = [PrefixTable], args = [ALL_CASES[0], ALL_CASES[5]])]
     fn prefix_table<T: 'static>(bencher: Bencher, case: &Case) {
         let response_bytes = &case.request();
