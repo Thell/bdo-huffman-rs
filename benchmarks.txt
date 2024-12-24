@@ -259,14 +259,24 @@ bdo_huffman_rs                                           fastest       │ slowe
    │  │  ╰─ TreeNode                                                   │               │               │               │         │
    │  │     ├─ large (msg_len=70.5k)                     949.6 ns      │ 6.974 µs      │ 1.012 µs      │ 1.027 µs      │ 10000   │ 80000
    │  │     ╰─ small_min (msg_len=40b)                   899.6 ns      │ 5.312 µs      │ 962.1 ns      │ 982.1 ns      │ 10000   │ 80000
-   │  ╰─ symbols_heap                                                  │               │               │               │         │
-   │     ├─ FlatNode                                                   │               │               │               │         │
-   │     │  ├─ large (msg_len=70.5k)                     92.65 ns      │ 439.5 ns      │ 95.78 ns      │ 96.35 ns      │ 10000   │ 1280000
-   │     │  ├─ large (msg_len=70.5k)                     154.3 ns      │ 646.5 ns      │ 163.7 ns      │ 166.3 ns      │ 10000   │ 640000
-   │     │  ╰─ small_min (msg_len=40b)                   137.1 ns      │ 680.9 ns      │ 145 ns        │ 146.4 ns      │ 10000   │ 640000
-   │     ╰─ TreeNode                                                   │               │               │               │         │
-   │        ├─ large (msg_len=70.5k)                     593.4 ns      │ 2.449 µs      │ 618.4 ns      │ 625.1 ns      │ 10000   │ 160000
-   │        ╰─ small_min (msg_len=40b)                   555.9 ns      │ 2.393 µs      │ 587.1 ns      │ 588 ns        │ 10000   │ 160000
+   │  ├─ symbols_heap                                                  │               │               │               │         │
+   │  │   ├─ FlatNode                                                  │               │               │               │         │
+   │  │   │  ├─ large (msg_len=70.5k)                    92.65 ns      │ 439.5 ns      │ 95.78 ns      │ 96.35 ns      │ 10000   │ 1280000
+   │  │   │  ├─ large (msg_len=70.5k)                    154.3 ns      │ 646.5 ns      │ 163.7 ns      │ 166.3 ns      │ 10000   │ 640000
+   │  │   │  ╰─ small_min (msg_len=40b)                  137.1 ns      │ 680.9 ns      │ 145 ns        │ 146.4 ns      │ 10000   │ 640000
+   │  │   ╰─ TreeNode                                                  │               │               │               │         │
+   │  │      ├─ large (msg_len=70.5k)                    593.4 ns      │ 2.449 µs      │ 618.4 ns      │ 625.1 ns      │ 10000   │ 160000
+   │  │      ╰─ small_min (msg_len=40b)                  555.9 ns      │ 2.393 µs      │ 587.1 ns      │ 588 ns        │ 10000   │ 160000
+   │  ╰─ tree                                                          │               │               │               │         │
+   │    ├─ FlatNode                                                    │               │               │               │         │
+   │    │  ├─ large (msg_len=70.5k)                      299.7 ns      │ 19.59 µs      │ 299.7 ns      │ 329.6 ns      │ 10000   │ 10000
+   │    │  ╰─ small_min (msg_len=40b)                    252.8 ns      │ 1.065 µs      │ 259 ns        │ 261.8 ns      │ 10000   │ 320000
+   │    ├─ FlatNodeSafe                                                │               │               │               │         │
+   │    │  ├─ large (msg_len=70.5k)                      151.2 ns      │ 412.2 ns      │ 160.6 ns      │ 161.5 ns      │ 10000   │ 640000
+   │    │  ╰─ small_min (msg_len=40b)                    134 ns        │ 416.9 ns      │ 141.9 ns      │ 142 ns        │ 10000   │ 640000
+   │    ╰─ TreeNode                                                    │               │               │               │         │
+   │        ├─ large (msg_len=70.5k)                     574.7 ns      │ 2.824 µs      │ 599.7 ns      │ 605 ns        │ 10000   │ 160000
+   │        ╰─ small_min (msg_len=40b)                   537.2 ns      │ 2.293 µs      │ 562.2 ns      │ 567.4 ns      │ 10000   │ 160000
    ╰─ flatnode_multi_symbol                                            │               │               │               │         │
       ╰─ prefix_table                                                  │               │               │               │         │
          ├─ FlatNode                                                   │               │               │               │         │
