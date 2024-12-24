@@ -3,7 +3,6 @@ pub struct MinHeap<T: MinHeapNode>(Vec<T>);
 pub trait MinHeapNode {
     fn frequency(&self) -> u32;
     fn new(symbol: Option<u8>, frequency: u32) -> Self;
-    fn new_parent(left: Self, right: Self) -> Self;
 }
 
 impl<T: MinHeapNode> Default for MinHeap<T> {

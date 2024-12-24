@@ -3,7 +3,7 @@ use std::{collections::HashMap, hash::BuildHasherDefault};
 
 use crate::{
     min_heap::{MinHeap, MinHeapNode},
-    node::{FlatNode, TreeNode},
+    node::{FlatNode, FlatNodeSafe, TreeNode},
 };
 
 pub(crate) type PrefixMap = HashMap<u8, String, BuildHasherDefault<NoHashHasher<u8>>>;
@@ -182,6 +182,41 @@ impl Packet<'_> {
 
         tree
     }
+
+    pub fn flatnode_tree_safe(&self) -> Vec<FlatNodeSafe> {
+        let mut heap = self.symbols_heap::<FlatNodeSafe>();
+
+        let mut right_index = 2 * self.symbol_count as usize - 1;
+        let mut tree = vec![FlatNodeSafe::default(); right_index];
+        right_index -= 1;
+
+        loop {
+            // Move two smallest nodes from heap to vec ensuring smallest on the left
+            let left = heap.pop();
+            let right = heap.pop();
+            let parent_frequency = left.frequency + right.frequency;
+
+            // Add children to the tree vec
+            tree[right_index - 1] = left;
+            tree[right_index] = right;
+
+            // Add parent node to the heap for ordering
+            heap.push(FlatNodeSafe::new_parent(
+                parent_frequency,
+                right_index as u8 - 1,
+                right_index as u8,
+            ));
+
+            right_index -= 2;
+            if right_index < 2 {
+                // Move the last node (the root) to the tree vec
+                tree[0] = heap.pop();
+                break;
+            }
+        }
+
+        tree
+    }
 }
 
 // Prefix Generation
@@ -272,6 +307,46 @@ impl Packet<'_> {
             }
 
             unsafe { *prefix_entry.lens.get_unchecked_mut(byte as usize) = write_index as u8 };
+            prefix_entry.bits_used[byte as usize] = bits_used;
+        }
+
+        prefix_entry
+    }
+
+    pub fn flatnode_prefix_table_safe(&self, tree: &[FlatNodeSafe]) -> PrefixTable {
+        // Generate a multi-symbol lookup table.
+        // Decodes all 8 step paths through the tree storing each symbol visited,
+        // the number of symbols written, and the number of bits used when the
+        // last symbol was visited.
+        let mut prefix_entry = PrefixTable::new();
+        let root = &tree[0];
+
+        for byte in 0u8..=255 {
+            let symbols = &mut prefix_entry.symbols[byte as usize];
+            let mut node = root;
+            let mut bits = byte;
+            let mut bits_used = 0;
+            let mut write_index = 0;
+
+            for i in 0..8 {
+                let direction = (bits & 0b1000_0000) != 0;
+                node = match direction {
+                    true => &tree[node.right_index as usize],
+                    false => &tree[node.left_index as usize],
+                };
+                if let Some(symbol) = node.symbol {
+                    symbols[write_index] = symbol;
+                    write_index += 1;
+                    bits_used = i + 1;
+                    if write_index == 6 {
+                        break;
+                    }
+                    node = root;
+                }
+                bits <<= 1;
+            }
+
+            prefix_entry.lens[byte as usize] = write_index as u8;
             prefix_entry.bits_used[byte as usize] = bits_used;
         }
 
@@ -397,7 +472,7 @@ mod common {
         });
     }
 
-    #[divan::bench(types = [TreeNode, FlatNode], args = [ALL_CASES[0], ALL_CASES[5]])]
+    #[divan::bench(types = [TreeNode, FlatNode, FlatNodeSafe], args = [ALL_CASES[0], ALL_CASES[5]])]
     fn tree<T: MinHeapNode + 'static>(bencher: Bencher, case: &Case) {
         let response_bytes = &case.request();
         let packet = &Packet::new(response_bytes);
@@ -407,7 +482,9 @@ mod common {
                 black_box(packet.treenode_tree());
             } else if std::any::TypeId::of::<T>() == std::any::TypeId::of::<FlatNode>() {
                 black_box(packet.flatnode_tree());
-            };
+            } else if std::any::TypeId::of::<T>() == std::any::TypeId::of::<FlatNodeSafe>() {
+                black_box(packet.flatnode_tree_safe());
+            }
         });
     }
 
@@ -437,14 +514,19 @@ mod flatnode_multi_symbol {
     use divan::{black_box, Bencher};
 
     #[allow(clippy::extra_unused_type_parameters)]
-    #[divan::bench(types = [PrefixTable], args = [ALL_CASES[0], ALL_CASES[5]])]
+    #[divan::bench(types = [FlatNode, FlatNodeSafe], args = [ALL_CASES[0], ALL_CASES[5]])]
     fn prefix_table<T: 'static>(bencher: Bencher, case: &Case) {
         let response_bytes = &case.request();
         let packet = &Packet::new(response_bytes);
         let flatnode_tree = packet.flatnode_tree();
+        let flatnode_tree_safe = packet.flatnode_tree_safe();
 
         bencher.bench_local(move || {
-            packet.flatnode_prefix_table(black_box(&flatnode_tree));
+            if std::any::TypeId::of::<T>() == std::any::TypeId::of::<FlatNode>() {
+                packet.flatnode_prefix_table(black_box(&flatnode_tree));
+            } else if std::any::TypeId::of::<T>() == std::any::TypeId::of::<FlatNodeSafe>() {
+                packet.flatnode_prefix_table_safe(black_box(&flatnode_tree_safe));
+            }
         });
     }
 }

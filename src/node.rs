@@ -16,14 +16,6 @@ impl MinHeapNode for TreeNode {
     fn new(symbol: Option<u8>, frequency: u32) -> Self {
         TreeNode::new(symbol, frequency)
     }
-    fn new_parent(left: Self, right: Self) -> Self {
-        TreeNode {
-            symbol: None,
-            frequency: left.frequency + right.frequency,
-            left_child: Some(Box::new(left)),
-            right_child: Some(Box::new(right)),
-        }
-    }
 }
 
 impl Ord for TreeNode {
@@ -46,15 +38,83 @@ impl TreeNode {
             right_child: None,
         }
     }
+    pub fn new_parent(left: Self, right: Self) -> Self {
+        TreeNode {
+            symbol: None,
+            frequency: left.frequency + right.frequency,
+            left_child: Some(Box::new(left)),
+            right_child: Some(Box::new(right)),
+        }
+    }
 }
 
 ///////////////////////////////////////////////////////////////////////////////
+
+#[repr(C)]
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct FlatNode {
+pub struct FlatNodeSafe {
+    pub left_index: u8,
+    pub right_index: u8,
     pub symbol: Option<u8>,
     pub frequency: u32,
+}
+
+impl MinHeapNode for FlatNodeSafe {
+    fn frequency(&self) -> u32 {
+        self.frequency
+    }
+    fn new(symbol: Option<u8>, frequency: u32) -> Self {
+        FlatNodeSafe::new(symbol, frequency)
+    }
+}
+
+impl Ord for FlatNodeSafe {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.frequency.cmp(&other.frequency)
+    }
+}
+impl PartialOrd for FlatNodeSafe {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Default for FlatNodeSafe {
+    fn default() -> Self {
+        Self {
+            symbol: None,
+            frequency: 0,
+            left_index: 0,
+            right_index: 0,
+        }
+    }
+}
+impl FlatNodeSafe {
+    pub fn new(symbol: Option<u8>, frequency: u32) -> Self {
+        Self {
+            symbol,
+            frequency,
+            left_index: 0,
+            right_index: 0,
+        }
+    }
+    pub fn new_parent(frequency: u32, left_index: u8, right_index: u8) -> Self {
+        Self {
+            symbol: None,
+            frequency,
+            left_index,
+            right_index,
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+#[repr(C)]
+pub struct FlatNode {
     pub left_ptr: *const FlatNode,
     pub right_ptr: *const FlatNode,
+    pub symbol: Option<u8>,
+    pub frequency: u32,
 }
 
 impl MinHeapNode for FlatNode {
@@ -63,14 +123,6 @@ impl MinHeapNode for FlatNode {
     }
     fn new(symbol: Option<u8>, frequency: u32) -> Self {
         FlatNode::new(symbol, frequency)
-    }
-    fn new_parent(left: Self, right: Self) -> Self {
-        FlatNode {
-            symbol: None,
-            frequency: left.frequency + right.frequency,
-            left_ptr: &left as *const _,
-            right_ptr: &right as *const _,
-        }
     }
 }
 
