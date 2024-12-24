@@ -1,34 +1,154 @@
-# BDO Huffman Decoder
+BDO Huffman Decoder
+====================
 
-This project explores implementing a specific
-[Huffman encoding](https://en.wikipedia.org/wiki/Huffman_coding) decoder to
-decompress packet contents in responses from calls to BDO's GetWorldMarket
-endpoints.
-
-A few different approaches of decoding the Huffman message are explored.
-
-## Full Packet Processing Results
-
-Average times. Includes all steps to parse and decode the incoming packet.
-
-Baseline uses TreeNode with simple BitVec bit by bit traversal.
-
-| Test Message Size | BaseLine | TreeNode |  FlatNode   |    Table    | BaseLine / 🚀 |
-|:-----------------:|:--------:|:--------:|:-----------:|:-----------:|:-------------:|
-|       70.5k       | 402.2 µs | 177.8 µs |  176.9 µs   | 56.54 µs 🚀 |     7.11      |
-|       33.3k       | 189.2 µs | 62.99 µs |  62.29 µs   | 26.97 µs 🚀 |     7.01      |
-|       22.5k       | 124.0 µs | 28.04 µs |  27.26 µs   | 18.27 µs 🚀 |     6.79      |
-|       11.1k       | 55.84 µs | 14.14 µs |  13.60 µs   | 9.499 µs 🚀 |     5.88      |
-|       5.5k        | 47.26 µs | 8.665 µs |  8.090 µs   | 5.587 µs 🚀 |     8.46      |
-|        40b        | 849.2 ns | 746.3 ns | 321.6 ns 🚀 |  1.162 µs   |     2.64      |
-
-_Tested on a Ryzen 5700G_
+This project explores a few different approaches implementing a specific Huffman
+encoding decoder to decompress packet contents in responses from calls to BDO's
+GetWorldMarket endpoints.
 
 ## Usage
-Clone the repo and run any of:
+Clone the repo and run either:
 
 - `cargo test`
 - `cargo bench`
+
+## Full Packet Processing Results
+
+The table below highlights how data layout and algorithm choice impacted
+performance. The different design decisions are detailed later.
+
+The timings in the table include all steps to parse and decode the packet.
+Times are the average 1,000,000 samples, lower is better.
+
+| Approach     | Safe¹  | Children |    70.5k     |    33.3k     |    22.5k     |    11.1k     |     5.5k     |     40b      | Decoding Throughput³ |
+|--------------|:-------|:--------:|:------------:|:------------:|:------------:|:------------:|:------------:|:------------:|:--------------------:|
+| **Nested**   | Yes    |   Box    |   300.5 µs   |   136.3 µs   |   78.46 µs   |   26.58 µs   |   17.55 µs   |   694.3 ns   |      235.6 MB/s      |
+| **Nested**   | No     |   Box    |   177.6 µs   |   63.18 µs   |   27.50 µs   |   13.85 µs   |   8.463 µs   |   656.8 ns   |       399 MB/s       |
+|              |        |          |              |              |              |              |              |              |                      |
+| **Flat**²    | Yes    |  Index   |   305.1 µs   |   138.1 µs   |   80.89 µs   |   27.61 µs   |   18.55 µs   | **278.3 ns** |      231.9 MB/s      |
+| **Flat**     | No-ptr |  Const   |   178.6 µs   |   63.40 µs   |   28.29 µs   |   14.14 µs   |   8.234 µs   |   358.3 µs   |      394.2 MB/s      |
+| **Flat**     | No     |  Const   |   175.1 µs   |   62.10 µs   |   27.04 µs   |   13.45 µs   |   8.028 µs   |   347.4 ns   |      403.2 MB/s      |
+|              |        |          |              |              |              |              |              |              |                      |
+| **Table**    | Yes    |  Index   |   61.48 µs   |   29.58 µs   |   20.06 µs   |   10.65 µs   |   6.568 µs   |   1.845 µs   |      1.179 GB/s      |
+| **Table**    | No-ptr |  Const   |   61.13 µs   |   29.20 µs   |   19.62 µs   |   10.21 µs   |   5.994 µs   |   1.212 µs   |      1.179 GB/s      |
+| **Table**    | No     |  Const   | **57.14 µs** | **27.25 µs** | **18.26 µs** | **9.567 µs** | **5.528 µs** |   1.184 µs   |      1.264 GB/s      |
+|              |        |          |              |              |              |              |              |              |                      |
+| **BaseLine** | Yes    |   Box    |   355.6 µs   |   162.3 µs   |   105.4 µs   |   46.35 µs   |   36.64 µs   |   730.1 ns   |      201.5 MB/s      |
+
+¹Yes: Entirely safe code; no unsafe operations anywhere.  
+¹No-ptr: Uses only const pointer dereferences as the sole unsafe operation, otherwise safe.  
+¹No: Includes many unsafe practices like unchecked accesses, raw pointer manipulations, and other explicit unsafe operations.  
+²Fast tree building and slow decoding, gains are gone after 64 encoded bytes.  
+³Measured 70.5k length message with decoded symbols as the unit.
+
+Tested on a Ryzen 5700G.
+
+## Decoding Approaches
+
+In the world of data compression the message sizes are miniscule. This means
+many of the algorithms and optimizations used in decompression libraries are not
+beneficial since any overhead in the preparation of the decoding would have a
+difficult time being amortized away before decoding is completed. Also, since
+the symbols are dynamic and the encoding scheme is set any optimizations that
+require specific encoding or embeddings are also not useful.
+
+
+### Baseline:
+
+This implementation uses a fully safe, direct traversal of a nested `TreeNode`
+structure to decode the Huffman-encoded message. It initializes a `BitVec` from
+the encoded message bytes and iterates through the bitstream one bit at a time.
+It branches at each bit to the `left_child` or `right_child` of the current
+node and resets to the root when a node with `Some(symbol)` value is reached
+and appended to the decoded message `String`.
+
+#### Key Points:
+
+- **Safe code:** Uses `Option<Box<TreeNode>>` for child references.
+- **Minimal preparation cost:** Only requires building the Huffman tree.
+- **Simple and direct:** Provides a clean and readable implementation but lacks
+  performance optimizations.
+
+### TreeNode:
+
+This implementation builds on the `Baseline` approach but uses an optimized
+loop to process each encoded byte more efficiently. The decoder reads one byte
+at a time in an outer loop and processes each bit in an inner loop. The
+decoded message is written to a pre-allocated Vec<u8>.
+
+#### Key Improvements:
+
+- **Inner loop optimization:** The loop over the bits of each byte is fully
+  unrolled by the compiler, using a single byte pointer, eliminating conditional
+  checks for better performance.
+- **String elimination:** Replaces the `String` with a `Vec<u8>` which is
+  allocated up-front, assigned to and then converted to a `String` using
+  `from_utf8`.
+
+#### Safety:
+
+- **Iteration**: The safe version uses an iterator while the unsafe version uses
+  a simple `loop` and unchecked gets for the bytes.
+- **Reduced branch misprediction:** Double-pointer indirection minimizes
+  branching during tree traversal, improving CPU pipeline efficiency.
+- **Decoded message**: The safe version assigns to each indexed element of the
+  decoded message while the unsafe version assigns symbols via a ptr and offset.
+
+
+### FlatNode:
+
+This approach builds on the TreeNode approach but uses a flat representation of
+the tree instead of a nested representation. Using this flat layout allows
+either indices or pointers to be used for child node linking.
+
+An observation of the TreeNode approach for small messages is that building the
+heap (tree) is ~85% of the total processing time. Using a flat representation
+allows for a simpler Node and reduces the heap (tree) building time by 75% so
+that it accounts for less than 50% of the time on the small messages.
+
+#### Key Improvements:
+
+- **Array-based traversal:** reduces upfront costs of tree building.
+
+#### Safety:
+
+- **Iteration**: The safe version uses an iterator while the unsafe version uses
+  a simple `loop` and dereferencing of const ptrs.
+
+
+### Table:
+
+This approach uses a multi-symbol lookup table built upfront by decoding all
+8-bit paths through the tree.
+
+An observation from analysis of the FlatNode approach is that the upfront cost
+of any prep work for faster decoding has to be amortized quickly when dealing
+with only 75k or less encoded bytes. After several failed experiments with a
+variety of table based, recursive trees, multi-symbol processing methods,
+SIMD, parallel, finite state machines and others I was ready to say it was just
+too small to amortize the setup costs.
+
+Using the FlatNode decoder to decode integers `0..=255` and storing the symbols
+traversed for each along with the symbol count and number of bits used each in
+their own flat array provides excellent data characteristics for the compiler
+and the cpu.
+
+#### Key Improvements:
+
+- **[Bitter](https://github.com/nickbabcock/bitter):** for
+  [blazing fast bit reading](https://github.com/nickbabcock/bitter#comparison-to-other-libraries).
+- **Multi-symbol:** flat lookup table for each 8 step path from `0..=255`
+  generated using the tree provided by `FlatNode`.
+- **Manual loop unrolling:** for both bulk ('outer') and per symbol ('inner')
+  loops.
+
+#### Safety:
+
+- **Iteration:** on both the fully safe and safe except const pointer deref
+  versions use the same safe decoding process, the difference is in the tree
+  building. The unsafe version uses mut ptr writes and unchecked reads.
+- **Bit buffering:** is fully checked in the safe version and unchecked for all
+  bits except the tail in the unsafe version.
+
 
 ## BDO's Huffman
 
@@ -166,89 +286,3 @@ it is directly tied to it.
 [bdoMarket Master Items Table](
 https://docs.google.com/spreadsheets/d/1LFri67Eb2nW8VmoG7FGNXIhGAexqGxdZnNQqvzCm-dw
 ) for categorized data to analyze.)_
-
-## Approaches
-
-In the world of data compression the message sizes are miniscule. This means
-many of the algorithms and optimizations used in decompression libraries are not
-beneficial since any overhead in the preparation of the decoding would have a
-difficult time being amortized away before decoding is completed. Also, since
-the symbols are dynamic and the encoding scheme is set any optimizations that
-require specific encoding or embeddings are also not useful.
-
-### Baseline
-```
-message_decoding_nested_baseline
-├─ large (msg_len=70.5k)           318 µs    
-│                                  221.8 MB/s
-├─ large_medium (msg_len=33.3k)    145.2 µs  
-│                                  229.3 MB/s
-├─ medium (msg_len=22.5k)          93.29 µs  
-│                                  241.6 MB/s
-├─ medium_small (msg_len=11.1k)    38.69 µs  
-│                                  288.6 MB/s
-├─ small (msg_len=5.5k)            23.89 µs  
-│                                  232.5 MB/s
-╰─ small_min (msg_len=40b)         105.2 ns  
-                                   380 MB/s  
-```
-
-- uses fully safe code
-- iterates over a BitVec while traversing a tree of nested nodes
-- has no need for prefix codes
-
-### Optimized
-```
-message_decoding_nested_optimized
-├─ large (msg_len=70.5k)           168.1 µs  
-│                                  419.6 MB/s
-├─ large_medium (msg_len=33.3k)    58.59 µs  
-│                                  568.7 MB/s
-├─ medium (msg_len=22.5k)          25.79 µs  
-│                                  873.9 MB/s
-├─ medium_small (msg_len=11.1k)    12.49 µs  
-│                                  893.7 MB/s
-├─ small (msg_len=5.5k)            7.399 µs  
-│                                  750.9 MB/s
-╰─ small_min (msg_len=40b)         60.71 ns  
-                                   658.7 MB/s
-```
-
-- removes BitVec
-- reads 1 source byte at a time and consumes 1 bit at a time
-- uses `get_unchecked` and `unwrap_unchecked` for reading and traversal
-- uses direct mut_ptr symbol assignment to decoded message buffer
-- converts decoded message buffer to a String without allocation or copying
-- has no need for prefix codes
-
-### Multi-Symbol Table Lookup
-```
-message_decoding_with_table
-├─ large (msg_len=70.5k)           121 µs    
-│                                  582.8 MB/s
-├─ large_medium (msg_len=33.3k)    42.59 µs  
-│                                  782.3 MB/s
-├─ medium (msg_len=22.5k)          27.89 µs  
-│                                  808.2 MB/s
-├─ medium_small (msg_len=11.1k)    13.49 µs  
-│                                  827.5 MB/s
-├─ small (msg_len=5.5k)            7.899 µs  
-│                                  703.4 MB/s
-╰─ small_min (msg_len=40b)         59.1 ns   
-                                   676.7 MB/s
-```
-- uses flat tree representation instead of nested which reduces extended prefix
-  building times from ~380 µs to 3.349 µs.
-
-- decodes integers 0..=255 to build extended prefix results into a table
-- uses a full byte of encoded message as the table index
-- extended prefixes contain 1 or more decoded symbols and bits used
-- manually unrolled 8 symbol matching (since the smallest prefix is '0')
-
-\* Note that these timings are better for the decoding but there is a little
-overhead and that overhead makes the table lookup method not viable for medium
-and small message sizes. The overhead is not represented in the bench results
-above but are present in the benches.  
-
-`cargo bench -- packet_decoding`.
-
