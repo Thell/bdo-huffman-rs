@@ -19,20 +19,17 @@ performance. The different design decisions are detailed later.
 The timings in the table include all steps to parse and decode the packet.
 Times are the average 1,000,000 samples, lower is better.
 
-|              | Safe¹ | Child |    70.5k     |    33.3k     |    22.5k     |    11.1k     |     5.5k     |     40b      |   Speed³   |
-|--------------|-------|:-----:|:------------:|:------------:|:------------:|:------------:|:------------:|:------------:|:----------:|
-| **Nested**   | ✅     |  Box  |   300.5 µs   |   136.3 µs   |   78.46 µs   |   26.58 µs   |   17.55 µs   |   694.3 ns   | 235.6 MB/s |
-| **Nested**   | ❌     |  Box  |   177.6 µs   |   63.18 µs   |   27.50 µs   |   13.85 µs   |   8.463 µs   |   656.8 ns   |  399 MB/s  |
-|              |       |       |              |              |              |              |              |              |            |
-| **Flat**²    | ✅     | Index |   305.1 µs   |   138.1 µs   |   80.89 µs   |   27.61 µs   |   18.55 µs   | **278.3 ns** | 231.9 MB/s |
-| **Flat**     | ❓     | Const |   178.6 µs   |   63.40 µs   |   28.29 µs   |   14.14 µs   |   8.234 µs   |   358.3 µs   | 394.2 MB/s |
-| **Flat**     | ❌     | Const |   175.1 µs   |   62.10 µs   |   27.04 µs   |   13.45 µs   |   8.028 µs   |   347.4 ns   | 403.2 MB/s |
-|              |       |       |              |              |              |              |              |              |            |
-| **Table**    | ✅     | Index |   61.48 µs   |   29.58 µs   |   20.06 µs   |   10.65 µs   |   6.568 µs   |   1.845 µs   | 1.179 GB/s |
-| **Table**    | ❓     | Const |   61.13 µs   |   29.20 µs   |   19.62 µs   |   10.21 µs   |   5.994 µs   |   1.212 µs   | 1.179 GB/s |
-| **Table**    | ❌     | Const | **57.14 µs** | **27.25 µs** | **18.26 µs** | **9.567 µs** | **5.528 µs** |   1.184 µs   | 1.264 GB/s |
-|              |       |       |              |              |              |              |              |              |            |
-| **BaseLine** | ✅     |  Box  |   355.6 µs   |   162.3 µs   |   105.4 µs   |   46.35 µs   |   36.64 µs   |   730.1 ns   | 201.5 MB/s |
+| Approach     | Safety¹ | Child |    70.5k     |    33.3k     |    22.5k     |    11.1k     |     5.5k     |     40b      | Decoding Throughput³ |
+|--------------|:-------:|:-----:|:------------:|:------------:|:------------:|:------------:|:------------:|:------------:|:--------------------:|
+| **Nested**   |    ✅    |  Box  |   300.5 µs   |   136.3 µs   |   78.46 µs   |   26.58 µs   |   17.55 µs   |   694.3 ns   |      235.6 MB/s      |
+| **Nested**   |    ❌    |  Box  |   177.6 µs   |   63.18 µs   |   27.50 µs   |   13.85 µs   |   8.463 µs   |   656.8 ns   |       399 MB/s       |
+| **Flat**²    |    ✅    | Index |   305.1 µs   |   138.1 µs   |   80.89 µs   |   27.61 µs   |   18.55 µs   | **278.3 ns** |      231.9 MB/s      |
+| **Flat**     |    ❓    | Const |   178.6 µs   |   63.40 µs   |   28.29 µs   |   14.14 µs   |   8.234 µs   |   358.3 µs   |      394.2 MB/s      |
+| **Flat**     |    ❌    | Const |   175.1 µs   |   62.10 µs   |   27.04 µs   |   13.45 µs   |   8.028 µs   |   347.4 ns   |      403.2 MB/s      |
+| **Table**    |    ✅    | Index |   61.48 µs   |   29.58 µs   |   20.06 µs   |   10.65 µs   |   6.568 µs   |   1.845 µs   |      1.179 GB/s      |
+| **Table**    |    ❓    | Const |   61.13 µs   |   29.20 µs   |   19.62 µs   |   10.21 µs   |   5.994 µs   |   1.212 µs   |      1.179 GB/s      |
+| **Table**    |    ❌    | Const | **57.14 µs** | **27.25 µs** | **18.26 µs** | **9.567 µs** | **5.528 µs** |   1.184 µs   |      1.264 GB/s      |
+| **BaseLine** |    ✅    |  Box  |   355.6 µs   |   162.3 µs   |   105.4 µs   |   46.35 µs   |   36.64 µs   |   730.1 ns   |      201.5 MB/s      |
 
 ¹✅ Entirely safe code; no unsafe operations anywhere.  
 ¹❓ Uses only const pointer dereferences as the sole unsafe operation, otherwise safe.  
