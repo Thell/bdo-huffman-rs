@@ -185,9 +185,9 @@ pub fn flatnode_decode_message_traverse_safe_index(
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // Tree Traversal - FlatNode - A minimally unsafe version
 pub fn flatnode_decode_packet_traverse_safe_const(content: &[u8]) -> String {
-    let packet = Packet::new(content);
+    let packet = &Packet::new(content);
     let tree = packet.flatnode_tree();
-    flatnode_decode_message_traverse_safe_const(&packet, &tree)
+    flatnode_decode_message_traverse_safe_const(packet, &tree)
 }
 
 pub fn flatnode_decode_message_traverse_safe_const(packet: &Packet, tree: &[FlatNode]) -> String {
@@ -226,9 +226,9 @@ pub fn flatnode_decode_message_traverse_safe_const(packet: &Packet, tree: &[Flat
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // Tree Traversal - FlatNode
 pub fn flatnode_decode_packet_traverse(content: &[u8]) -> String {
-    let packet = Packet::new(content);
+    let packet = &Packet::new(content);
     let tree = packet.flatnode_tree();
-    flatnode_decode_message_traverse(&packet, &tree)
+    flatnode_decode_message_traverse(packet, &tree)
 }
 
 #[allow(clippy::unnecessary_cast)]
@@ -629,7 +629,7 @@ mod tests {
 
     #[test]
     fn flatnode_decode_message_traverse_safe_const() {
-        let packet = Packet::new(&TEST_BYTES);
+        let packet = &Packet::new(&TEST_BYTES);
         let tree = packet.flatnode_tree();
         let decoded_message = super::flatnode_decode_message_traverse_safe_const(&packet, &tree);
         assert_eq!(decoded_message, EXPECTED_MESSAGE);
@@ -654,7 +654,7 @@ mod tests {
 
     #[test]
     fn flatnode_decode_message_traverse() {
-        let packet = Packet::new(&TEST_BYTES);
+        let packet = &Packet::new(&TEST_BYTES);
         let tree = packet.flatnode_tree();
         let decoded_message = super::flatnode_decode_message_traverse(&packet, &tree);
         assert_eq!(decoded_message, EXPECTED_MESSAGE);
@@ -705,7 +705,7 @@ mod tests {
 
     #[test]
     fn flatnode_decode_message_prefix_table_safe_const() {
-        let packet = Packet::new(&TEST_BYTES);
+        let packet = &Packet::new(&TEST_BYTES);
         let tree = packet.flatnode_tree();
         let table = packet.flatnode_prefix_table(&tree);
         let decoded_message = super::flatnode_decode_message_prefix_table_safe(&packet, &table);
@@ -731,7 +731,7 @@ mod tests {
 
     #[test]
     fn flatnode_decode_message_prefix_table() {
-        let packet = Packet::new(&TEST_BYTES);
+        let packet = &Packet::new(&TEST_BYTES);
         let tree = packet.flatnode_tree();
         let table = packet.flatnode_prefix_table(&tree);
         let decoded_message = super::flatnode_decode_message_prefix_table(&packet, &table);
@@ -795,7 +795,7 @@ mod benches_message {
             #[divan::bench(args = ALL_CASES)]
             fn $name(bencher: Bencher, case: &Case) {
                 let response_bytes = case.request();
-                let packet = Packet::new(&response_bytes);
+                let packet = &Packet::new(&response_bytes);
                 let tree = packet.$tree();
                 bencher
                     .counter(BytesCount::from(packet.decoded_bytes_len))
@@ -811,7 +811,7 @@ mod benches_message {
             #[divan::bench(args = ALL_CASES)]
             fn $name(bencher: Bencher, case: &Case) {
                 let response_bytes = case.request();
-                let packet = Packet::new(&response_bytes);
+                let packet = &Packet::new(&response_bytes);
                 let tree = packet.$tree();
                 let table = packet.$table(&tree);
                 bencher

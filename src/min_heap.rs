@@ -83,7 +83,7 @@ impl<T: MinHeapNode> MinHeap<T> {
 
 #[cfg(test)]
 mod tests {
-    use crate::node::{FlatNode, TreeNode};
+    use crate::node::{FlatNodeSafe, TreeNode};
     use crate::test_cases::*;
 
     use super::MinHeap;
@@ -106,9 +106,9 @@ mod tests {
     #[test]
     fn pop_order_flatnode() {
         // Tests the integrity of the MinHeap min element ordering.
-        let mut heap = MinHeap::<FlatNode>::new();
+        let mut heap = MinHeap::<FlatNodeSafe>::new();
         for (symbol, frequency) in EXPECTED_SYMBOL_TABLE {
-            heap.push(FlatNode::new(Some(symbol), frequency));
+            heap.push(FlatNodeSafe::new(Some(symbol), frequency));
         }
         let mut pop_order = Vec::<Option<u8>>::new();
         while !heap.is_empty() {
@@ -124,17 +124,17 @@ mod tests {
 #[divan::bench_group(sample_count = 10_000)]
 mod common {
     use super::*;
-    use crate::node::{FlatNode, TreeNode};
+    use crate::node::{FlatNodeSafe, TreeNode};
     use crate::test_cases::EXPECTED_SYMBOL_TABLE;
 
     use divan::{black_box, Bencher};
 
-    #[divan::bench(types = [TreeNode, FlatNode])]
+    #[divan::bench(types = [TreeNode, FlatNodeSafe])]
     fn alloc<T: MinHeapNode>() -> MinHeap<T> {
         MinHeap::<T>::default()
     }
 
-    #[divan::bench(types = [TreeNode, FlatNode])]
+    #[divan::bench(types = [TreeNode, FlatNodeSafe])]
     fn push<T: MinHeapNode>(bencher: Bencher) {
         let mut heap = MinHeap::<T>::new();
         bencher.bench_local(move || {
@@ -144,7 +144,7 @@ mod common {
         });
     }
 
-    #[divan::bench(types = [TreeNode, FlatNode])]
+    #[divan::bench(types = [TreeNode, FlatNodeSafe])]
     fn pop<T: MinHeapNode>(bencher: Bencher) {
         let mut heap = MinHeap::<T>::new();
         EXPECTED_SYMBOL_TABLE
@@ -157,7 +157,7 @@ mod common {
         });
     }
 
-    #[divan::bench(types = [TreeNode, FlatNode])]
+    #[divan::bench(types = [TreeNode, FlatNodeSafe])]
     fn roundtrip<T: MinHeapNode>() {
         let mut heap = MinHeap::<T>::new();
         EXPECTED_SYMBOL_TABLE

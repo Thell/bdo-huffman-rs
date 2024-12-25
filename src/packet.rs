@@ -144,11 +144,10 @@ impl Packet<'_> {
     }
 
     pub fn flatnode_tree(&self) -> Vec<FlatNode> {
-        let mut heap = self.symbols_heap::<FlatNode>();
+        let mut heap = self.symbols_heap::<FlatNodeSafe>();
 
         let mut right_index = 2 * self.symbol_count as usize - 1;
         let mut tree = vec![FlatNode::default(); right_index];
-        let tree_ptr = tree.as_mut_ptr();
         right_index -= 1;
 
         loop {
@@ -157,29 +156,31 @@ impl Packet<'_> {
             let right = heap.pop();
             let parent_frequency = left.frequency + right.frequency;
 
-            // Add children to the tree vec
-            unsafe {
-                *tree_ptr.add(right_index - 1) = left;
-                *tree_ptr.add(right_index) = right;
-            }
+            // Add popped nodes to the tree vec by setting the existing node values
+            tree[right_index - 1].symbol = left.symbol;
+            tree[right_index].symbol = right.symbol;
+            tree[right_index - 1].left_ptr = &tree[left.left_index as usize] as *const FlatNode;
+            tree[right_index].left_ptr = &tree[right.left_index as usize] as *const FlatNode;
+            tree[right_index - 1].right_ptr = &tree[left.right_index as usize] as *const FlatNode;
+            tree[right_index].right_ptr = &tree[right.right_index as usize] as *const FlatNode;
 
-            // Add parent node to the heap for ordering
-            heap.push(FlatNode::new_parent(
+            // Add a parent node to the heap for ordering
+            heap.push(FlatNodeSafe::new_parent(
                 parent_frequency,
-                unsafe { tree_ptr.add(right_index - 1) },
-                unsafe { tree_ptr.add(right_index) },
+                right_index as u8 - 1,
+                right_index as u8,
             ));
 
             right_index -= 2;
             if right_index < 2 {
                 // Move the last node (the root) to the tree vec
-                unsafe {
-                    *tree_ptr = heap.pop();
-                }
+                let root = heap.pop();
+                tree[0].symbol = root.symbol;
+                tree[0].left_ptr = &tree[root.left_index as usize] as *const FlatNode;
+                tree[0].right_ptr = &tree[root.right_index as usize] as *const FlatNode;
                 break;
             }
         }
-
         tree
     }
 
@@ -214,7 +215,6 @@ impl Packet<'_> {
                 break;
             }
         }
-
         tree
     }
 }
@@ -394,7 +394,7 @@ mod tests {
     #[test]
     fn flatnode_tree() {
         // Tests the integrity of the MinHeap tree building.
-        let packet = &Packet::new(&TEST_BYTES);
+        let packet = &mut Packet::new(&TEST_BYTES);
         let root = packet.flatnode_tree();
 
         let built_prefixes = packet.flatnode_prefix_map(&root);
@@ -418,7 +418,7 @@ mod tests {
         for case in SAMPLE_CASES {
             println!("case: {}", case.name);
             let content = case.request();
-            let packet = &Packet::new(&content);
+            let packet = &mut Packet::new(&content);
 
             let nested_tree = packet.treenode_tree();
             let nested_tree_prefixes = packet.treenode_prefix_map(&nested_tree);
@@ -463,7 +463,7 @@ mod common {
         });
     }
 
-    #[divan::bench(types = [TreeNode, FlatNode], args = [ALL_CASES[0], ALL_CASES[5]])]
+    #[divan::bench(types = [TreeNode, FlatNodeSafe], args = [ALL_CASES[0], ALL_CASES[5]])]
     fn symbols_heap<T: MinHeapNode>(bencher: Bencher, case: &Case) {
         let response_bytes = &case.request();
         let packet = &Packet::new(response_bytes);
@@ -473,9 +473,9 @@ mod common {
     }
 
     #[divan::bench(types = [TreeNode, FlatNode, FlatNodeSafe], args = [ALL_CASES[0], ALL_CASES[5]])]
-    fn tree<T: MinHeapNode + 'static>(bencher: Bencher, case: &Case) {
+    fn tree<T: 'static>(bencher: Bencher, case: &Case) {
         let response_bytes = &case.request();
-        let packet = &Packet::new(response_bytes);
+        let packet = &mut Packet::new(response_bytes);
 
         bencher.bench_local(move || {
             if std::any::TypeId::of::<T>() == std::any::TypeId::of::<TreeNode>() {
@@ -489,9 +489,9 @@ mod common {
     }
 
     #[divan::bench(types = [TreeNode, FlatNode], args = [ALL_CASES[0], ALL_CASES[5]])]
-    fn prefix_map<T: MinHeapNode + 'static>(bencher: Bencher, case: &Case) {
+    fn prefix_map<T: 'static>(bencher: Bencher, case: &Case) {
         let response_bytes = &case.request();
-        let packet = &Packet::new(response_bytes);
+        let packet = &mut Packet::new(response_bytes);
 
         let treenode_tree = packet.treenode_tree();
         let flatnode_tree = packet.flatnode_tree();
@@ -517,7 +517,7 @@ mod flatnode_multi_symbol {
     #[divan::bench(types = [FlatNode, FlatNodeSafe], args = [ALL_CASES[0], ALL_CASES[5]])]
     fn prefix_table<T: 'static>(bencher: Bencher, case: &Case) {
         let response_bytes = &case.request();
-        let packet = &Packet::new(response_bytes);
+        let packet = &mut Packet::new(response_bytes);
         let flatnode_tree = packet.flatnode_tree();
         let flatnode_tree_safe = packet.flatnode_tree_safe();
 
