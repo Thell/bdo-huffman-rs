@@ -51,7 +51,7 @@ impl TreeNode {
 ///////////////////////////////////////////////////////////////////////////////
 
 #[repr(C)]
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct FlatNodeSafe {
     pub left_index: u8,
     pub right_index: u8,
@@ -79,16 +79,6 @@ impl PartialOrd for FlatNodeSafe {
     }
 }
 
-impl Default for FlatNodeSafe {
-    fn default() -> Self {
-        Self {
-            symbol: None,
-            frequency: 0,
-            left_index: 0,
-            right_index: 0,
-        }
-    }
-}
 impl FlatNodeSafe {
     pub fn new(symbol: Option<u8>, frequency: u32) -> Self {
         Self {

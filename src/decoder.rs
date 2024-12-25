@@ -344,7 +344,7 @@ fn lookup_unchecked_prefix_table_safe(
     bits: &mut BigEndianReader,
     table: &crate::packet::PrefixTable,
     write_index: &mut usize,
-    decoded: &mut Vec<u8>,
+    decoded: &mut [u8],
 ) {
     let index = bits.peek(8) as usize;
 
@@ -352,7 +352,7 @@ fn lookup_unchecked_prefix_table_safe(
     let len = table.lens[index] as usize;
     let used_bits = table.bits_used[index];
 
-    get_symbols_unchecked_safe(symbols, len as usize, write_index, decoded);
+    get_symbols_unchecked_safe(symbols, len, write_index, decoded);
     bits.consume(used_bits as u32);
 }
 
@@ -361,7 +361,7 @@ fn lookup_prefix_table_safe(
     bits: &mut BigEndianReader,
     table: &crate::packet::PrefixTable,
     write_index: &mut usize,
-    decoded: &mut Vec<u8>,
+    decoded: &mut [u8],
 ) {
     let lookahead_count = bits.lookahead_bits().min(8);
     let last_bits = bits.peek(lookahead_count);
@@ -382,7 +382,7 @@ fn get_symbols_unchecked_safe(
     symbols: &[u8],
     len: usize,
     write_index: &mut usize,
-    decoded: &mut Vec<u8>,
+    decoded: &mut [u8],
 ) {
     // Manually unroll the loop for performance. Approximately 20% speedup.
     decoded[*write_index] = symbols[0];
