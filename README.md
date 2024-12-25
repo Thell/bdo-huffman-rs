@@ -19,23 +19,22 @@ performance. The different design decisions are detailed later.
 The timings in the table include all steps to parse and decode the packet.
 Times are the average 1,000,000 samples, lower is better.
 
-| Approach     | Safety¹ | Child |    70.5k     |    33.3k     |    22.5k     |    11.1k     |     5.5k     |     40b      | Decoding Throughput³ |
-|--------------|:-------:|:-----:|:------------:|:------------:|:------------:|:------------:|:------------:|:------------:|:--------------------:|
-| **Nested**   |    ✅    |  Box  |   300.5 µs   |   136.3 µs   |   78.46 µs   |   26.58 µs   |   17.55 µs   |   694.3 ns   |      235.6 MB/s      |
-| **Nested**   |    ❌    |  Box  |   177.6 µs   |   63.18 µs   |   27.50 µs   |   13.85 µs   |   8.463 µs   |   656.8 ns   |       399 MB/s       |
-| **Flat**²    |    ✅    | Index |   305.1 µs   |   138.1 µs   |   80.89 µs   |   27.61 µs   |   18.55 µs   | **278.3 ns** |      231.9 MB/s      |
-| **Flat**     |    ❓    | Const |   178.6 µs   |   63.40 µs   |   28.29 µs   |   14.14 µs   |   8.234 µs   |   358.3 µs   |      394.2 MB/s      |
-| **Flat**     |    ❌    | Const |   175.1 µs   |   62.10 µs   |   27.04 µs   |   13.45 µs   |   8.028 µs   |   347.4 ns   |      403.2 MB/s      |
-| **Table**    |    ✅    | Index |   61.48 µs   |   29.58 µs   |   20.06 µs   |   10.65 µs   |   6.568 µs   |   1.845 µs   |      1.179 GB/s      |
-| **Table**    |    ❓    | Const |   61.13 µs   |   29.20 µs   |   19.62 µs   |   10.21 µs   |   5.994 µs   |   1.212 µs   |      1.179 GB/s      |
-| **Table**    |    ❌    | Const | **57.14 µs** | **27.25 µs** | **18.26 µs** | **9.567 µs** | **5.528 µs** |   1.184 µs   |      1.264 GB/s      |
-| **BaseLine** |    ✅    |  Box  |   355.6 µs   |   162.3 µs   |   105.4 µs   |   46.35 µs   |   36.64 µs   |   730.1 ns   |      201.5 MB/s      |
+| Approach     | Safety | Child |    70.5k     |    33.3k     |    22.5k     |    11.1k     |     5.5k     |     40b      | Decoding Throughput¹ |
+|--------------|:------:|:-----:|:------------:|:------------:|:------------:|:------------:|:------------:|:------------:|:--------------------:|
+| **BaseLine** |   ✅    |  Box  |   349.7 µs   |   162.0 µs   |   107.5 µs   |   44.81 µs   |   28.61 µs   |   715.2 ns   |      201.3 MB/s      |
+| **Nested**   |   ✅    |  Box  |   298.8 µs   |   134.3 µs   |   77.56 µs   |   26.20 µs   |   17.28 µs   |   688.1 ns   |      236.9 MB/s      |
+| **Nested**   |   ❌    |  Box  |   177.1 µs   |   62.94 µs   |   27.10 µs   |   13.66 µs   |   8.403 µs   |   650.6 ns   |      400.9 MB/s      |
+| **Flat**     |   ✅    | Index |   301.7 µs   |   137.9 µs   |   78.61 µs   |   27.13 µs   |   18.14 µs   |   268.0 ns   |      234.3 MB/s      |
+| **Flat**     |   ❓    | Const |   177.8 µs   |   64.10 µs   |   27.59 µs   |   13.58 µs   |   7.992 µs   |   255.2 ns   |      396.9 MB/s      |
+| **Flat**     |   ❌    | Const |   175.1 µs   |   61.49 µs   |   26.59 µs   |   13.10 µs   |   7.992 µs   | **243.4 ns** |      403.4 MB/s      |
+| **Table**    |   ✅    | Index |   60.27 µs   |   29.04 µs   |   19.73 µs   |   10.49 µs   |   6.419 µs   |   1.836 µs   |      1.204 GB/s      |
+| **Table**    |   ❓    | Const |   59.77 µs   |   28.46 µs   |   19.17 µs   |   9.909 µs   |   5.747 µs   |   1.126 µs   |      1.204 GB/s      |
+| **Table**    |   ❌    | Const | **56.58 µs** | **27.00 µs** | **18.27 µs** | **9.442 µs** | **5.342 µs** |   1.117 µs   |      1.271 GB/s      |
 
-¹✅ Entirely safe code; no unsafe operations anywhere.  
-¹❓ Uses only const pointer dereferences as the sole unsafe operation, otherwise safe.  
-¹❌ Includes many unsafe practices like unchecked accesses, raw pointer manipulations, and other explicit unsafe operations.  
-²Fast tree building and slow decoding, gains are gone after 64 encoded bytes.  
-³Measured 70.5k length message with decoded symbols as the unit.
+✅ Entirely safe code; no unsafe operations anywhere.  
+❓ Uses only const pointer dereferences as the sole unsafe operation, otherwise safe.  
+❌ Includes many unsafe practices like unchecked accesses, raw pointer manipulations, and other explicit unsafe operations.  
+¹Measured 70.5k length message with decoded symbols as the unit.
 
 Tested on a Ryzen 5700G.
 
