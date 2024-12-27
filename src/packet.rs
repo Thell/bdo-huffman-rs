@@ -14,7 +14,7 @@ pub(crate) const MAX_SYMBOLS: usize = 12; // digits 0-9, '|' and '-'
 #[repr(C)]
 pub struct PrefixTable {
     pub bits_used: [u8; 256],
-    pub lens: [u8; 256],
+    pub _pad: [u8; 256],
     pub symbols: [[u8; 6]; 256],
 }
 
@@ -27,6 +27,30 @@ impl Default for PrefixTable {
 impl PrefixTable {
     pub fn new() -> Self {
         PrefixTable {
+            bits_used: [0u8; 256],
+            _pad: [0u8; 256],
+            symbols: [[0u8; 6]; 256],
+        }
+    }
+}
+
+// Extended prefixes in flat array layout.
+#[repr(C)]
+pub struct PrefixTableSafe {
+    pub bits_used: [u8; 256],
+    pub lens: [u8; 256],
+    pub symbols: [[u8; 6]; 256],
+}
+
+impl Default for PrefixTableSafe {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl PrefixTableSafe {
+    pub fn new() -> Self {
+        PrefixTableSafe {
             bits_used: [0u8; 256],
             lens: [0u8; 256],
             symbols: [[0u8; 6]; 256],
@@ -297,7 +321,7 @@ impl Packet<'_> {
                         *symbols_ptr.add(write_index) = symbol;
                         write_index += 1;
                         bits_used = i + 1;
-                        if write_index == 6 {
+                        if write_index == 5 {
                             break;
                         }
                         node = root;
@@ -305,20 +329,64 @@ impl Packet<'_> {
                     bits <<= 1;
                 }
             }
-
-            unsafe { *prefix_entry.lens.get_unchecked_mut(byte as usize) = write_index as u8 };
             prefix_entry.bits_used[byte as usize] = bits_used;
         }
 
         prefix_entry
     }
 
-    pub fn flatnode_prefix_table_safe(&self, tree: &[FlatNodeSafe]) -> PrefixTable {
+    #[allow(clippy::unnecessary_cast)]
+    pub fn flatnode_prefix_table_safe_const(&self, tree: &[FlatNode]) -> PrefixTableSafe {
         // Generate a multi-symbol lookup table.
         // Decodes all 8 step paths through the tree storing each symbol visited,
         // the number of symbols written, and the number of bits used when the
         // last symbol was visited.
-        let mut prefix_entry = PrefixTable::new();
+        let mut prefix_entry = PrefixTableSafe::new();
+        let root = unsafe { tree.get_unchecked(0) };
+
+        for byte in 0u8..=255 {
+            let symbols = &mut prefix_entry.symbols[byte as usize];
+            let mut node = root;
+            let mut bits = byte;
+            let mut bits_used = 0;
+            let mut write_index = 0;
+
+            for i in 0..8 {
+                let direction = ((bits & 0b1000_0000) != 0) as usize;
+                node = unsafe {
+                    (*(&node.left_ptr as *const _ as *const *const FlatNode)
+                        .add(direction)
+                        .as_ref()
+                        .unwrap_unchecked())
+                    .as_ref()
+                    .unwrap_unchecked()
+                };
+
+                if let Some(symbol) = node.symbol {
+                    symbols[write_index] = symbol;
+                    write_index += 1;
+                    bits_used = i + 1;
+                    if write_index == 6 {
+                        break;
+                    }
+                    node = root;
+                }
+                bits <<= 1;
+            }
+
+            prefix_entry.lens[byte as usize] = write_index as u8;
+            prefix_entry.bits_used[byte as usize] = bits_used;
+        }
+
+        prefix_entry
+    }
+
+    pub fn flatnode_prefix_table_safe_index(&self, tree: &[FlatNodeSafe]) -> PrefixTableSafe {
+        // Generate a multi-symbol lookup table.
+        // Decodes all 8 step paths through the tree storing each symbol visited,
+        // the number of symbols written, and the number of bits used when the
+        // last symbol was visited.
+        let mut prefix_entry = PrefixTableSafe::new();
         let root = &tree[0];
 
         for byte in 0u8..=255 {
@@ -525,7 +593,7 @@ mod flatnode_multi_symbol {
             if std::any::TypeId::of::<T>() == std::any::TypeId::of::<FlatNode>() {
                 packet.flatnode_prefix_table(black_box(&flatnode_tree));
             } else if std::any::TypeId::of::<T>() == std::any::TypeId::of::<FlatNodeSafe>() {
-                packet.flatnode_prefix_table_safe(black_box(&flatnode_tree_safe));
+                packet.flatnode_prefix_table_safe_index(black_box(&flatnode_tree_safe));
             }
         });
     }

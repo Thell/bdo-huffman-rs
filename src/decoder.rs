@@ -279,23 +279,21 @@ pub fn flatnode_decode_message_traverse(packet: &Packet, tree: &[FlatNode]) -> S
 pub fn flatnode_decode_packet_prefix_table_safe_index(content: &[u8]) -> String {
     let packet = &Packet::new(content);
     let flat_tree = &packet.flatnode_tree_safe();
-    let extended_prefix_entries = &packet.flatnode_prefix_table_safe(flat_tree);
+    let extended_prefix_entries = &packet.flatnode_prefix_table_safe_index(flat_tree);
     flatnode_decode_message_prefix_table_safe(packet, extended_prefix_entries)
 }
 
-////////////////////////////////////////////////////////////////////////////////////////////////////
 // Table Lookup - PrefixTable - A minimally unsafe version
-// Comment or uncomment the `unsafe` blocks to switch between boxed (safe) and const ptr (unsafe).
 pub fn flatnode_decode_packet_prefix_table_safe_const(content: &[u8]) -> String {
     let packet = &Packet::new(content);
     let flat_tree = &packet.flatnode_tree();
-    let extended_prefix_entries = &packet.flatnode_prefix_table(flat_tree);
+    let extended_prefix_entries = &packet.flatnode_prefix_table_safe_const(flat_tree);
     flatnode_decode_message_prefix_table_safe(packet, extended_prefix_entries)
 }
 
 pub fn flatnode_decode_message_prefix_table_safe(
     packet: &Packet,
-    table: &crate::packet::PrefixTable,
+    table: &crate::packet::PrefixTableSafe,
 ) -> String {
     let mut decoded: Vec<u8> = vec![0; packet.decoded_bytes_len as usize + 8];
     let mut write_index = 0usize;
@@ -342,7 +340,7 @@ pub fn flatnode_decode_message_prefix_table_safe(
 #[inline(always)]
 fn lookup_unchecked_prefix_table_safe(
     bits: &mut BigEndianReader,
-    table: &crate::packet::PrefixTable,
+    table: &crate::packet::PrefixTableSafe,
     write_index: &mut usize,
     decoded: &mut [u8],
 ) {
@@ -359,7 +357,7 @@ fn lookup_unchecked_prefix_table_safe(
 #[inline(always)]
 fn lookup_prefix_table_safe(
     bits: &mut BigEndianReader,
-    table: &crate::packet::PrefixTable,
+    table: &crate::packet::PrefixTableSafe,
     write_index: &mut usize,
     decoded: &mut [u8],
 ) {
@@ -391,18 +389,26 @@ fn get_symbols_unchecked_safe(
     if len > 1 {
         decoded[*write_index] = symbols[1];
         *write_index += 1;
+    } else {
+        return;
     }
     if len > 2 {
         decoded[*write_index] = symbols[2];
         *write_index += 1;
+    } else {
+        return;
     }
     if len > 3 {
         decoded[*write_index] = symbols[3];
         *write_index += 1;
+    } else {
+        return;
     }
     if len > 4 {
         decoded[*write_index] = symbols[4];
         *write_index += 1;
+    } else {
+        return;
     }
     if len > 5 {
         decoded[*write_index] = symbols[5];
@@ -482,10 +488,9 @@ unsafe fn lookup_unchecked_prefix_table(
     let index = bits.peek(8) as usize;
 
     let symbols = table.symbols.get_unchecked(index);
-    let len = *table.lens.get_unchecked(index);
     let used_bits = *table.bits_used.get_unchecked(index);
 
-    get_symbols_unchecked(symbols, len as usize, write_index, decoded);
+    get_symbols_unchecked(symbols, write_index, decoded);
     bits.consume(used_bits as u32);
 }
 
@@ -501,43 +506,45 @@ unsafe fn lookup_prefix_table(
     let index = (last_bits << (8 - lookahead_count)) as usize;
 
     let symbols = table.symbols.get_unchecked(index);
-    let len = *table.lens.get_unchecked(index) as usize;
     let used_bits = *table.bits_used.get_unchecked(index);
 
-    get_symbols_unchecked(symbols, len, write_index, decoded);
+    get_symbols_unchecked(symbols, write_index, decoded);
 
     let bits_to_consume = lookahead_count.min(used_bits as u32);
     bits.consume(bits_to_consume);
 }
 
 #[inline(always)]
-unsafe fn get_symbols_unchecked(
-    symbols: &[u8],
-    len: usize,
-    write_index: &mut usize,
-    decoded: &mut [u8],
-) {
+unsafe fn get_symbols_unchecked(symbols: &[u8], write_index: &mut usize, decoded: &mut [u8]) {
     // Manually unroll the loop for performance. Approximately 50% speedup.
     *decoded.as_mut_ptr().add(*write_index) = *symbols.get_unchecked(0);
     *write_index += 1;
 
-    if len > 1 {
+    if *symbols.get_unchecked(1) > 0 {
         *decoded.as_mut_ptr().add(*write_index) = *symbols.get_unchecked(1);
         *write_index += 1;
+    } else {
+        return;
     }
-    if len > 2 {
+    if *symbols.get_unchecked(2) > 0 {
         *decoded.as_mut_ptr().add(*write_index) = *symbols.get_unchecked(2);
         *write_index += 1;
+    } else {
+        return;
     }
-    if len > 3 {
+    if *symbols.get_unchecked(3) > 0 {
         *decoded.as_mut_ptr().add(*write_index) = *symbols.get_unchecked(3);
         *write_index += 1;
+    } else {
+        return;
     }
-    if len > 4 {
+    if *symbols.get_unchecked(4) > 0 {
         *decoded.as_mut_ptr().add(*write_index) = *symbols.get_unchecked(4);
         *write_index += 1;
+    } else {
+        return;
     }
-    if len > 5 {
+    if *symbols.get_unchecked(5) > 0 {
         *decoded.as_mut_ptr().add(*write_index) = *symbols.get_unchecked(5);
         *write_index += 1;
     }
@@ -681,7 +688,7 @@ mod tests {
     fn flatnode_decode_message_prefix_table_safe_index() {
         let packet = Packet::new(&TEST_BYTES);
         let tree = packet.flatnode_tree_safe();
-        let table = packet.flatnode_prefix_table_safe(&tree);
+        let table = packet.flatnode_prefix_table_safe_index(&tree);
         let decoded_message = super::flatnode_decode_message_prefix_table_safe(&packet, &table);
         assert_eq!(decoded_message, EXPECTED_MESSAGE);
     }
@@ -707,7 +714,7 @@ mod tests {
     fn flatnode_decode_message_prefix_table_safe_const() {
         let packet = &Packet::new(&TEST_BYTES);
         let tree = packet.flatnode_tree();
-        let table = packet.flatnode_prefix_table(&tree);
+        let table = packet.flatnode_prefix_table_safe_const(&tree);
         let decoded_message = super::flatnode_decode_message_prefix_table_safe(&packet, &table);
         assert_eq!(decoded_message, EXPECTED_MESSAGE);
     }
@@ -840,7 +847,7 @@ mod benches_message {
     bench_decode_message_table!(
         flatnode_decode_message_prefix_table_safe,
         flatnode_tree_safe,
-        flatnode_prefix_table_safe
+        flatnode_prefix_table_safe_index
     );
 }
 
