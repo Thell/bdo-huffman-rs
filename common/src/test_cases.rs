@@ -1,3 +1,5 @@
+pub const BENCH_SAMPLE_COUNT: u32 = 1_000_000;
+
 #[derive(Debug, Clone, Copy)]
 pub struct Case {
     pub name: &'static str,
@@ -15,7 +17,7 @@ impl Case {
     pub fn request(&self) -> Vec<u8> {
         let filepath = env!("CARGO_MANIFEST_DIR");
         let filepath = format!(
-            "{}/sample_data/GetWorldMarketList_{}_{}.bin",
+            "{}/../_sample_data/GetWorldMarketList_{}_{}.bin",
             filepath, self.main_category, self.sub_category
         );
         let filename = std::path::Path::new(&filepath);
@@ -35,7 +37,7 @@ pub const ALL_CASES: &[Case] = &[
 
 // The following are used in tests and benches in nested modules and will report as unused.
 #[allow(unused)]
-pub(crate) const TEST_BYTES: [u8; 136] = [
+pub const TEST_BYTES: [u8; 136] = [
     136, 0, 0, 0, 0, 0, 0, 0, 12, 0, 0, 0, 6, 0, 0, 0, 45, 0, 0, 0, 11, 0, 0, 0, 48, 0, 0, 0, 3, 0,
     0, 0, 49, 0, 0, 0, 1, 0, 0, 0, 50, 0, 0, 0, 2, 0, 0, 0, 51, 0, 0, 0, 1, 0, 0, 0, 52, 0, 0, 0,
     6, 0, 0, 0, 53, 0, 0, 0, 2, 0, 0, 0, 54, 0, 0, 0, 2, 0, 0, 0, 55, 0, 0, 0, 3, 0, 0, 0, 56, 0,
@@ -44,10 +46,10 @@ pub(crate) const TEST_BYTES: [u8; 136] = [
 ];
 
 #[allow(unused)]
-pub(crate) const EXPECTED_MESSAGE: &str = "53801-0-55556-41900|53802-0-16807-70000|";
+pub const EXPECTED_MESSAGE: &str = "53801-0-55556-41900|53802-0-16807-70000|";
 
 #[allow(unused)]
-pub(crate) const EXPECTED_POP_ORDER: [Option<u8>; 12] = [
+pub const EXPECTED_POP_ORDER: [Option<u8>; 12] = [
     Some(50),
     Some(57),
     Some(52),
@@ -63,7 +65,7 @@ pub(crate) const EXPECTED_POP_ORDER: [Option<u8>; 12] = [
 ];
 
 #[allow(unused)]
-pub(crate) const EXPECTED_PREFIXES: [(&str, &str); 12] = [
+pub const EXPECTED_PREFIXES: [(&str, &str); 12] = [
     ("0", "10"),
     ("1", "000"),
     ("2", "110110"),
@@ -80,7 +82,7 @@ pub(crate) const EXPECTED_PREFIXES: [(&str, &str); 12] = [
 
 #[rustfmt::skip]
 #[allow(unused)]
-pub(crate) const EXPECTED_SYMBOL_TABLE: [(u8, u32); 12] = [
+pub const EXPECTED_SYMBOL_TABLE: [(u8, u32); 12] = [
     (45, 6), (48, 11), (49, 3), (50, 1), (51, 2), (52, 1),
     (53, 6), (54, 2), (55, 2), (56, 3), (57, 1), (124, 2),
 ];

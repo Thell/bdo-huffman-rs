@@ -2,20 +2,45 @@
 name = "bdo-huffman-rs"
 version = "0.1.0"
 edition = "2021"
+resolver = "2"
 
-[profile.release]
-debug = 1
+[workspace]
+members = [
+    "common",
 
-[dependencies]
-bit-vec = "0.8.0"
-bitter = "0.7.1"
-divan = "0.1.17"
+    "baseline",
+    "nested_box",
+    "nested_unsafe_box",
+    "flat_index",
+    "flat_ptr",
+    "flat_unsafe_ptr",
+    "table_index",
+    "table_ptr",
+    "table_unsafe_ptr",
+]
+
+[workspace.dependencies]
+common = { version = "*", path = "common" }
 mimalloc = "0.1.43"
 nohash-hasher = "0.2.0"
-reqwest = {version = "0.12.9", features = ["blocking", "json"] }
-serde_json = "1.0.133"
+divan = "0.1.17"
+
+[dev-dependencies]
+divan = "0.1.17"
+paste = "1.0.15"
+
+common = { version = "*", path = "common" }
+baseline = { version = "*", path = "baseline" }
+nested_box = { version = "*", path = "nested_box" }
+nested_unsafe_box = { version = "*", path = "nested_unsafe_box" }
+flat_index = { version = "*", path = "flat_index" }
+flat_ptr = { version = "*", path = "flat_ptr" }
+flat_unsafe_ptr = { version = "*", path = "flat_unsafe_ptr" }
+table_index = { version = "*", path = "table_index" }
+table_ptr = { version = "*", path = "table_ptr" }
+table_unsafe_ptr = { version = "*", path = "table_unsafe_ptr" }
+
 
 [[bench]]
 name = "benches"
 harness = false
-

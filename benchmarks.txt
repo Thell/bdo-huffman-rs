@@ -1,285 +1,225 @@
-bdo_huffman_rs                                           fastest       │ slowest       │ median        │ mean          │ samples │ iters
-├─ decoder                                                             │               │               │               │         │
-│  ├─ benches_message                                                  │               │               │               │         │
-│  │  ├─ flatnode_decode_message_prefix_table                          │               │               │               │         │
-│  │  │  ├─ large (msg_len=70.5k)                        51.59 µs      │ 181.7 µs      │ 52.09 µs      │ 52.35 µs      │ 1000000 │ 1000000
-│  │  │  │                                               1.367 GB/s    │ 388.2 MB/s    │ 1.354 GB/s    │ 1.347 GB/s    │         │
-│  │  │  ├─ large_medium (msg_len=33.3k)                 23.99 µs      │ 81.19 µs      │ 24.29 µs      │ 24.3 µs       │ 1000000 │ 1000000
-│  │  │  │                                               1.388 GB/s    │ 410.4 MB/s    │ 1.371 GB/s    │ 1.371 GB/s    │         │
-│  │  │  ├─ medium (msg_len=22.5k)                       15.99 µs      │ 72.69 µs      │ 16.29 µs      │ 16.27 µs      │ 1000000 │ 1000000
-│  │  │  │                                               1.409 GB/s    │ 310.1 MB/s    │ 1.383 GB/s    │ 1.385 GB/s    │         │
-│  │  │  ├─ medium_small (msg_len=11.1k)                 7.599 µs      │ 56.59 µs      │ 7.799 µs      │ 7.838 µs      │ 1000000 │ 1000000
-│  │  │  │                                               1.47 GB/s     │ 197.3 MB/s    │ 1.432 GB/s    │ 1.425 GB/s    │         │
-│  │  │  ├─ small (msg_len=5.5k)                         4.099 µs      │ 90.04 µs      │ 4.199 µs      │ 4.223 µs      │ 1000000 │ 2000000
-│  │  │  │                                               1.355 GB/s    │ 61.71 MB/s    │ 1.323 GB/s    │ 1.315 GB/s    │         │
-│  │  │  ╰─ small_min (msg_len=40b)                      64.21 ns      │ 197 ns        │ 66.16 ns      │ 66.04 ns      │ 1000000 │ 256000000
-│  │  │                                                  622.9 MB/s    │ 203 MB/s      │ 604.5 MB/s    │ 605.6 MB/s    │         │
-│  │  ├─ flatnode_decode_message_prefix_table_safe                     │               │               │               │         │
-│  │  │  ├─ large (msg_len=70.5k)                        57.19 µs      │ 815.6 µs      │ 58.09 µs      │ 58.48 µs      │ 1000000 │ 1000000
-│  │  │  │                                               1.233 GB/s    │ 86.52 MB/s    │ 1.214 GB/s    │ 1.206 GB/s    │         │
-│  │  │  ├─ large_medium (msg_len=33.3k)                 26.59 µs      │ 89.59 µs      │ 27.09 µs      │ 27.26 µs      │ 1000000 │ 1000000
-│  │  │  │                                               1.252 GB/s    │ 371.9 MB/s    │ 1.229 GB/s    │ 1.222 GB/s    │         │
-│  │  │  ├─ medium (msg_len=22.5k)                       17.39 µs      │ 125.3 µs      │ 17.89 µs      │ 18.01 µs      │ 1000000 │ 1000000
-│  │  │  │                                               1.295 GB/s    │ 179.8 MB/s    │ 1.259 GB/s    │ 1.251 GB/s    │         │
-│  │  │  ├─ medium_small (msg_len=11.1k)                 8.399 µs      │ 47.69 µs      │ 8.699 µs      │ 8.745 µs      │ 1000000 │ 1000000
-│  │  │  │                                               1.33 GB/s     │ 234.2 MB/s    │ 1.284 GB/s    │ 1.277 GB/s    │         │
-│  │  │  ├─ small (msg_len=5.5k)                         4.499 µs      │ 21.34 µs      │ 4.699 µs      │ 4.705 µs      │ 1000000 │ 2000000
-│  │  │  │                                               1.234 GB/s    │ 260.2 MB/s    │ 1.182 GB/s    │ 1.18 GB/s     │         │
-│  │  │  ╰─ small_min (msg_len=40b)                      70.07 ns      │ 349.7 ns      │ 72.41 ns      │ 72.32 ns      │ 1000000 │ 128000000
-│  │  │                                                  570.8 MB/s    │ 114.3 MB/s    │ 552.3 MB/s    │ 553 MB/s      │         │
-│  │  ├─ flatnode_decode_message_traverse                              │               │               │               │         │
-│  │  │  ├─ large (msg_len=70.5k)                        170.3 µs      │ 828.5 µs      │ 173.6 µs      │ 174.5 µs      │ 1000000 │ 1000000
-│  │  │  │                                               414.1 MB/s    │ 85.17 MB/s    │ 406.3 MB/s    │ 404.4 MB/s    │         │
-│  │  │  ├─ large_medium (msg_len=33.3k)                 58.99 µs      │ 902.2 µs      │ 61.89 µs      │ 62.45 µs      │ 1000000 │ 1000000
-│  │  │  │                                               564.8 MB/s    │ 36.93 MB/s    │ 538.4 MB/s    │ 533.6 MB/s    │         │
-│  │  │  ├─ medium (msg_len=22.5k)                       25.89 µs      │ 121.3 µs      │ 26.29 µs      │ 26.36 µs      │ 1000000 │ 1000000
-│  │  │  │                                               870.6 MB/s    │ 185.7 MB/s    │ 857.3 MB/s    │ 855.1 MB/s    │         │
-│  │  │  ├─ medium_small (msg_len=11.1k)                 12.69 µs      │ 64.59 µs      │ 12.89 µs      │ 12.92 µs      │ 1000000 │ 1000000
-│  │  │  │                                               879.7 MB/s    │ 172.9 MB/s    │ 866 MB/s      │ 864.4 MB/s    │         │
-│  │  │  ├─ small (msg_len=5.5k)                         7.399 µs      │ 63.09 µs      │ 7.599 µs      │ 7.618 µs      │ 1000000 │ 1000000
-│  │  │  │                                               750.9 MB/s    │ 88.06 MB/s    │ 731.2 MB/s    │ 729.4 MB/s    │         │
-│  │  │  ╰─ small_min (msg_len=40b)                      78.66 ns      │ 723.1 ns      │ 80.22 ns      │ 80.67 ns      │ 1000000 │ 128000000
-│  │  │                                                  508.4 MB/s    │ 55.3 MB/s     │ 498.5 MB/s    │ 495.8 MB/s    │         │
-│  │  ├─ flatnode_decode_message_traverse_safe_const                   │               │               │               │         │
-│  │  │  ├─ large (msg_len=70.5k)                        173.7 µs      │ 3.06 ms       │ 176.9 µs      │ 177.6 µs      │ 1000000 │ 1000000
-│  │  │  │                                               406 MB/s      │ 23.06 MB/s    │ 398.7 MB/s    │ 397.3 MB/s    │         │
-│  │  │  ├─ large_medium (msg_len=33.3k)                 60.29 µs      │ 460 µs        │ 62.69 µs      │ 62.85 µs      │ 1000000 │ 1000000
-│  │  │  │                                               552.7 MB/s    │ 72.43 MB/s    │ 531.5 MB/s    │ 530.1 MB/s    │         │
-│  │  │  ├─ medium (msg_len=22.5k)                       26.79 µs      │ 530.2 µs      │ 27.29 µs      │ 27.61 µs      │ 1000000 │ 1000000
-│  │  │  │                                               841.3 MB/s    │ 42.52 MB/s    │ 825.9 MB/s    │ 816.6 MB/s    │         │
-│  │  │  ├─ medium_small (msg_len=11.1k)                 13.09 µs      │ 732.1 µs      │ 13.39 µs      │ 13.49 µs      │ 1000000 │ 1000000
-│  │  │  │                                               852.8 MB/s    │ 15.25 MB/s    │ 833.7 MB/s    │ 827.6 MB/s    │         │
-│  │  │  ├─ small (msg_len=5.5k)                         7.599 µs      │ 55.69 µs      │ 7.799 µs      │ 7.797 µs      │ 1000000 │ 1000000
-│  │  │  │                                               731.2 MB/s    │ 99.76 MB/s    │ 712.4 MB/s    │ 712.6 MB/s    │         │
-│  │  │  ╰─ small_min (msg_len=40b)                      85.69 ns      │ 2.95 µs       │ 87.26 ns      │ 87.78 ns      │ 1000000 │ 128000000
-│  │  │                                                  466.7 MB/s    │ 13.55 MB/s    │ 458.4 MB/s    │ 455.6 MB/s    │         │
-│  │  ├─ flatnode_decode_message_traverse_safe_index                   │               │               │               │         │
-│  │  │  ├─ large (msg_len=70.5k)                        297.3 µs      │ 4.765 ms      │ 302.2 µs      │ 303 µs        │ 1000000 │ 1000000
-│  │  │  │                                               237.3 MB/s    │ 14.81 MB/s    │ 233.4 MB/s    │ 232.9 MB/s    │         │
-│  │  │  ├─ large_medium (msg_len=33.3k)                 134.8 µs      │ 1.85 ms       │ 136.9 µs      │ 137.2 µs      │ 1000000 │ 1000000
-│  │  │  │                                               247 MB/s      │ 18 MB/s       │ 243.2 MB/s    │ 242.8 MB/s    │         │
-│  │  │  ├─ medium (msg_len=22.5k)                       78.39 µs      │ 460.9 µs      │ 80.09 µs      │ 80.2 µs       │ 1000000 │ 1000000
-│  │  │  │                                               287.6 MB/s    │ 48.91 MB/s    │ 281.5 MB/s    │ 281.1 MB/s    │         │
-│  │  │  ├─ medium_small (msg_len=11.1k)                 26.39 µs      │ 656.1 µs      │ 26.99 µs      │ 26.99 µs      │ 1000000 │ 1000000
-│  │  │  │                                               423.1 MB/s    │ 17.02 MB/s    │ 413.7 MB/s    │ 413.9 MB/s    │         │
-│  │  │  ├─ small (msg_len=5.5k)                         17.69 µs      │ 63.39 µs      │ 18.09 µs      │ 18.14 µs      │ 1000000 │ 1000000
-│  │  │  │                                               313.9 MB/s    │ 87.65 MB/s    │ 307 MB/s      │ 306.1 MB/s    │         │
-│  │  │  ╰─ small_min (msg_len=40b)                      116.9 ns      │ 410.6 ns      │ 123.1 ns      │ 123.6 ns      │ 1000000 │ 128000000
-│  │  │                                                  342 MB/s      │ 97.39 MB/s    │ 324.6 MB/s    │ 323.4 MB/s    │         │
-│  │  ├─ treenode_decode_message_traverse                              │               │               │               │         │
-│  │  │  ├─ large (msg_len=70.5k)                        171.9 µs      │ 1.308 ms      │ 175.1 µs      │ 175.7 µs      │ 1000000 │ 1000000
-│  │  │  │                                               410.3 MB/s    │ 53.92 MB/s    │ 402.8 MB/s    │ 401.6 MB/s    │         │
-│  │  │  ├─ large_medium (msg_len=33.3k)                 59.09 µs      │ 928.6 µs      │ 62.09 µs      │ 62.41 µs      │ 1000000 │ 1000000
-│  │  │  │                                               563.9 MB/s    │ 35.88 MB/s    │ 536.6 MB/s    │ 533.9 MB/s    │         │
-│  │  │  ├─ medium (msg_len=22.5k)                       26.19 µs      │ 1.425 ms      │ 26.89 µs      │ 26.97 µs      │ 1000000 │ 1000000
-│  │  │  │                                               860.6 MB/s    │ 15.81 MB/s    │ 838.2 MB/s    │ 836 MB/s      │         │
-│  │  │  ├─ medium_small (msg_len=11.1k)                 12.79 µs      │ 72.29 µs      │ 13.19 µs      │ 13.19 µs      │ 1000000 │ 1000000
-│  │  │  │                                               872.8 MB/s    │ 154.5 MB/s    │ 846.3 MB/s    │ 846.3 MB/s    │         │
-│  │  │  ├─ small (msg_len=5.5k)                         7.599 µs      │ 56.29 µs      │ 7.799 µs      │ 7.842 µs      │ 1000000 │ 1000000
-│  │  │  │                                               731.2 MB/s    │ 98.7 MB/s     │ 712.4 MB/s    │ 708.5 MB/s    │         │
-│  │  │  ╰─ small_min (msg_len=40b)                      79.44 ns      │ 298.9 ns      │ 82.57 ns      │ 82.11 ns      │ 1000000 │ 128000000
-│  │  │                                                  503.4 MB/s    │ 133.7 MB/s    │ 484.4 MB/s    │ 487.1 MB/s    │         │
-│  │  ├─ treenode_decode_message_traverse_baseline                     │               │               │               │         │
-│  │  │  ├─ large (msg_len=70.5k)                        333.8 µs      │ 2.672 ms      │ 346.5 µs      │ 348.4 µs      │ 1000000 │ 1000000
-│  │  │  │                                               211.3 MB/s    │ 26.4 MB/s     │ 203.6 MB/s    │ 202.5 MB/s    │         │
-│  │  │  ├─ large_medium (msg_len=33.3k)                 154.7 µs      │ 545.3 µs      │ 162.6 µs      │ 163 µs        │ 1000000 │ 1000000
-│  │  │  │                                               215.2 MB/s    │ 61.1 MB/s     │ 204.8 MB/s    │ 204.4 MB/s    │         │
-│  │  │  ├─ medium (msg_len=22.5k)                       97.59 µs      │ 1.727 ms      │ 104.2 µs      │ 106.7 µs      │ 1000000 │ 1000000
-│  │  │  │                                               231 MB/s      │ 13.05 MB/s    │ 216.1 MB/s    │ 211.1 MB/s    │         │
-│  │  │  ├─ medium_small (msg_len=11.1k)                 41.59 µs      │ 8.504 ms      │ 44.39 µs      │ 45.69 µs      │ 1000000 │ 1000000
-│  │  │  │                                               268.5 MB/s    │ 1.313 MB/s    │ 251.6 MB/s    │ 244.5 MB/s    │         │
-│  │  │  ├─ small (msg_len=5.5k)                         23.09 µs      │ 3.036 ms      │ 33.59 µs      │ 34.05 µs      │ 1000000 │ 1000000
-│  │  │  │                                               240.5 MB/s    │ 1.83 MB/s     │ 165.3 MB/s    │ 163.1 MB/s    │         │
-│  │  │  ╰─ small_min (msg_len=40b)                      148.1 ns      │ 7.054 µs      │ 157.5 ns      │ 158.8 ns      │ 1000000 │ 64000000
-│  │  │                                                  269.9 MB/s    │ 5.67 MB/s     │ 253.8 MB/s    │ 251.7 MB/s    │         │
-│  │  ╰─ treenode_decode_message_traverse_safe                         │               │               │               │         │
-│  │     ├─ large (msg_len=70.5k)                        289.8 µs      │ 8.117 ms      │ 299.7 µs      │ 302.4 µs      │ 1000000 │ 1000000
-│  │     │                                               243.4 MB/s    │ 8.694 MB/s    │ 235.4 MB/s    │ 233.3 MB/s    │         │
-│  │     ├─ large_medium (msg_len=33.3k)                 131.4 µs      │ 1.702 ms      │ 134.4 µs      │ 134.7 µs      │ 1000000 │ 1000000
-│  │     │                                               253.4 MB/s    │ 19.57 MB/s    │ 247.7 MB/s    │ 247.2 MB/s    │         │
-│  │     ├─ medium (msg_len=22.5k)                       74.59 µs      │ 811 µs        │ 76.69 µs      │ 76.81 µs      │ 1000000 │ 1000000
-│  │     │                                               302.2 MB/s    │ 27.8 MB/s     │ 293.9 MB/s    │ 293.5 MB/s    │         │
-│  │     ├─ medium_small (msg_len=11.1k)                 25.19 µs      │ 70.69 µs      │ 26.39 µs      │ 26.58 µs      │ 1000000 │ 1000000
-│  │     │                                               443.3 MB/s    │ 158 MB/s      │ 423.1 MB/s    │ 420.2 MB/s    │         │
-│  │     ├─ small (msg_len=5.5k)                         16.29 µs      │ 437.1 µs      │ 16.69 µs      │ 16.73 µs      │ 1000000 │ 1000000
-│  │     │                                               340.9 MB/s    │ 12.71 MB/s    │ 332.7 MB/s    │ 332.1 MB/s    │         │
-│  │     ╰─ small_min (msg_len=40b)                      111.4 ns      │ 5.781 µs      │ 120.8 ns      │ 121.1 ns      │ 1000000 │ 128000000
-│  │                                                     358.8 MB/s    │ 6.918 MB/s    │ 330.9 MB/s    │ 330.1 MB/s    │         │
-│  ├─ benches_packet                                                   │               │               │               │         │
-│  │  ├─ flatnode_decode_packet_prefix_table                           │               │               │               │         │
-│  │  │  ├─ large (msg_len=70.5k)                        52.79 µs      │ 591.6 µs      │ 53.29 µs      │ 53.54 µs      │ 1000000 │ 1000000
-│  │  │  ├─ large_medium (msg_len=33.3k)                 25.09 µs      │ 84.89 µs      │ 25.29 µs      │ 25.43 µs      │ 1000000 │ 1000000
-│  │  │  ├─ medium (msg_len=22.5k)                       17.09 µs      │ 63.99 µs      │ 17.39 µs      │ 17.45 µs      │ 1000000 │ 1000000
-│  │  │  ├─ medium_small (msg_len=11.1k)                 8.699 µs      │ 68.29 µs      │ 8.899 µs      │ 8.925 µs      │ 1000000 │ 1000000
-│  │  │  ├─ small (msg_len=5.5k)                         5.099 µs      │ 26.59 µs      │ 5.249 µs      │ 5.259 µs      │ 1000000 │ 2000000
-│  │  │  ╰─ small_min (msg_len=40b)                      1.037 µs      │ 9.237 µs      │ 1.062 µs      │ 1.069 µs      │ 1000000 │ 8000000
-│  │  ├─ flatnode_decode_packet_prefix_table_safe_const                │               │               │               │         │
-│  │  │  ├─ large (msg_len=70.5k)                        58.19 µs      │ 394.1 µs      │ 59.39 µs      │ 59.7 µs       │ 1000000 │ 1000000
-│  │  │  ├─ large_medium (msg_len=33.3k)                 27.69 µs      │ 199.3 µs      │ 28.39 µs      │ 28.48 µs      │ 1000000 │ 1000000
-│  │  │  ├─ medium (msg_len=22.5k)                       18.49 µs      │ 328.6 µs      │ 18.99 µs      │ 19.12 µs      │ 1000000 │ 1000000
-│  │  │  ├─ medium_small (msg_len=11.1k)                 9.599 µs      │ 638 µs        │ 9.899 µs      │ 9.941 µs      │ 1000000 │ 1000000
-│  │  │  ├─ small (msg_len=5.5k)                         5.499 µs      │ 41.59 µs      │ 5.699 µs      │ 5.722 µs      │ 1000000 │ 1000000
-│  │  │  ╰─ small_min (msg_len=40b)                      1.074 µs      │ 5.349 µs      │ 1.099 µs      │ 1.105 µs      │ 1000000 │ 8000000
-│  │  ├─ flatnode_decode_packet_prefix_table_safe_index                │               │               │               │         │
-│  │  │  ├─ large (msg_len=70.5k)                        58.99 µs      │ 1.068 ms      │ 60.19 µs      │ 60.51 µs      │ 1000000 │ 1000000
-│  │  │  ├─ large_medium (msg_len=33.3k)                 28.39 µs      │ 84.49 µs      │ 29.09 µs      │ 29.22 µs      │ 1000000 │ 1000000
-│  │  │  ├─ medium (msg_len=22.5k)                       19.19 µs      │ 66.49 µs      │ 19.69 µs      │ 19.78 µs      │ 1000000 │ 1000000
-│  │  │  ├─ medium_small (msg_len=11.1k)                 10.29 µs      │ 547.9 µs      │ 10.69 µs      │ 10.72 µs      │ 1000000 │ 1000000
-│  │  │  ├─ small (msg_len=5.5k)                         6.399 µs      │ 50.79 µs      │ 6.599 µs      │ 6.663 µs      │ 1000000 │ 1000000
-│  │  │  ╰─ small_min (msg_len=40b)                      1.949 µs      │ 24.94 µs      │ 2.049 µs      │ 2.055 µs      │ 1000000 │ 2000000
-│  │  ├─ flatnode_decode_packet_traverse                               │               │               │               │         │
-│  │  │  ├─ large (msg_len=70.5k)                        170.4 µs      │ 819.7 µs      │ 173.5 µs      │ 174.3 µs      │ 1000000 │ 1000000
-│  │  │  ├─ large_medium (msg_len=33.3k)                 59.09 µs      │ 223.8 µs      │ 61.39 µs      │ 61.8 µs       │ 1000000 │ 1000000
-│  │  │  ├─ medium (msg_len=22.5k)                       26.09 µs      │ 127.6 µs      │ 26.49 µs      │ 26.66 µs      │ 1000000 │ 1000000
-│  │  │  ├─ medium_small (msg_len=11.1k)                 12.89 µs      │ 51.59 µs      │ 13.09 µs      │ 13.14 µs      │ 1000000 │ 1000000
-│  │  │  ├─ small (msg_len=5.5k)                         7.599 µs      │ 39.29 µs      │ 7.799 µs      │ 7.806 µs      │ 1000000 │ 1000000
-│  │  │  ╰─ small_min (msg_len=40b)                      234.1 ns      │ 1.724 µs      │ 243.5 ns      │ 246 ns        │ 1000000 │ 32000000
-│  │  ├─ flatnode_decode_packet_traverse_safe_const                    │               │               │               │         │
-│  │  │  ├─ large (msg_len=70.5k)                        173.6 µs      │ 1.008 ms      │ 177 µs        │ 177.7 µs      │ 1000000 │ 1000000
-│  │  │  ├─ large_medium (msg_len=33.3k)                 60.59 µs      │ 692.1 µs      │ 63.29 µs      │ 63.67 µs      │ 1000000 │ 1000000
-│  │  │  ├─ medium (msg_len=22.5k)                       26.99 µs      │ 574.4 µs      │ 27.39 µs      │ 27.52 µs      │ 1000000 │ 1000000
-│  │  │  ├─ medium_small (msg_len=11.1k)                 13.29 µs      │ 698.6 µs      │ 13.49 µs      │ 13.6 µs       │ 1000000 │ 1000000
-│  │  │  ├─ small (msg_len=5.5k)                         7.799 µs      │ 702.5 µs      │ 7.999 µs      │ 8.085 µs      │ 1000000 │ 1000000
-│  │  │  ╰─ small_min (msg_len=40b)                      240.3 ns      │ 17.06 µs      │ 249.7 ns      │ 252.6 ns      │ 1000000 │ 32000000
-│  │  ├─ flatnode_decode_packet_traverse_safe_index                    │               │               │               │         │
-│  │  │  ├─ large (msg_len=70.5k)                        298.2 µs      │ 1.528 ms      │ 305.9 µs      │ 307.1 µs      │ 1000000 │ 1000000
-│  │  │  ├─ large_medium (msg_len=33.3k)                 135.3 µs      │ 929.7 µs      │ 137.4 µs      │ 137.8 µs      │ 1000000 │ 1000000
-│  │  │  ├─ medium (msg_len=22.5k)                       78.59 µs      │ 714.5 µs      │ 80.19 µs      │ 80.44 µs      │ 1000000 │ 1000000
-│  │  │  ├─ medium_small (msg_len=11.1k)                 26.59 µs      │ 585.7 µs      │ 27.09 µs      │ 27.28 µs      │ 1000000 │ 1000000
-│  │  │  ├─ small (msg_len=5.5k)                         17.99 µs      │ 544.4 µs      │ 18.39 µs      │ 18.4 µs       │ 1000000 │ 1000000
-│  │  │  ╰─ small_min (msg_len=40b)                      262.2 ns      │ 1.299 µs      │ 274.7 ns      │ 274.8 ns      │ 1000000 │ 32000000
-│  │  ├─ treenode_decode_packet_traverse                               │               │               │               │         │
-│  │  │  ├─ large (msg_len=70.5k)                        172.6 µs      │ 779.8 µs      │ 175.6 µs      │ 176.2 µs      │ 1000000 │ 1000000
-│  │  │  ├─ large_medium (msg_len=33.3k)                 60.29 µs      │ 269.2 µs      │ 66.89 µs      │ 65.55 µs      │ 1000000 │ 1000000
-│  │  │  ├─ medium (msg_len=22.5k)                       26.69 µs      │ 2.015 ms      │ 27.19 µs      │ 27.41 µs      │ 1000000 │ 1000000
-│  │  │  ├─ medium_small (msg_len=11.1k)                 13.39 µs      │ 553.8 µs      │ 13.69 µs      │ 13.73 µs      │ 1000000 │ 1000000
-│  │  │  ├─ small (msg_len=5.5k)                         8.199 µs      │ 78.59 µs      │ 8.399 µs      │ 8.424 µs      │ 1000000 │ 1000000
-│  │  │  ╰─ small_min (msg_len=40b)                      618.5 ns      │ 3.174 µs      │ 649.7 ns      │ 651.4 ns      │ 1000000 │ 16000000
-│  │  ├─ treenode_decode_packet_traverse_baseline                      │               │               │               │         │
-│  │  │  ├─ large (msg_len=70.5k)                        334.2 µs      │ 937.4 µs      │ 345.9 µs      │ 348.8 µs      │ 1000000 │ 1000000
-│  │  │  ├─ large_medium (msg_len=33.3k)                 155.2 µs      │ 675.2 µs      │ 165.2 µs      │ 164.2 µs      │ 1000000 │ 1000000
-│  │  │  ├─ medium (msg_len=22.5k)                       98.39 µs      │ 701.1 µs      │ 104.8 µs      │ 105.4 µs      │ 1000000 │ 1000000
-│  │  │  ├─ medium_small (msg_len=11.1k)                 41.29 µs      │ 2.002 ms      │ 45.39 µs      │ 45.65 µs      │ 1000000 │ 1000000
-│  │  │  ├─ small (msg_len=5.5k)                         23.49 µs      │ 96.39 µs      │ 33.39 µs      │ 30.92 µs      │ 1000000 │ 1000000
-│  │  │  ╰─ small_min (msg_len=40b)                      674.7 ns      │ 11.37 µs      │ 724.7 ns      │ 737.3 ns      │ 1000000 │ 4000000
-│  │  ╰─ treenode_decode_packet_traverse_safe                          │               │               │               │         │
-│  │     ├─ large (msg_len=70.5k)                        290.7 µs      │ 1.88 ms       │ 299.8 µs      │ 300.9 µs      │ 1000000 │ 1000000
-│  │     ├─ large_medium (msg_len=33.3k)                 132.1 µs      │ 3.275 ms      │ 135 µs        │ 135.6 µs      │ 1000000 │ 1000000
-│  │     ├─ medium (msg_len=22.5k)                       75.49 µs      │ 638.9 µs      │ 78.59 µs      │ 78.48 µs      │ 1000000 │ 1000000
-│  │     ├─ medium_small (msg_len=11.1k)                 25.79 µs      │ 87.59 µs      │ 26.29 µs      │ 26.37 µs      │ 1000000 │ 1000000
-│  │     ├─ small (msg_len=5.5k)                         16.89 µs      │ 57.19 µs      │ 17.39 µs      │ 17.38 µs      │ 1000000 │ 1000000
-│  │     ╰─ small_min (msg_len=40b)                      662.2 ns      │ 2.693 µs      │ 687.2 ns      │ 692.1 ns      │ 1000000 │ 16000000
-│  ├─ decode_packet_group_large                                        │               │               │               │         │
-│  │  ├─ flatnode_decode_packet_prefix_table             52.69 µs      │ 904 µs        │ 53.29 µs      │ 53.71 µs      │ 1000000 │ 1000000
-│  │  ├─ flatnode_decode_packet_prefix_table_safe_const  58.29 µs      │ 614 µs        │ 59.69 µs      │ 59.8 µs       │ 1000000 │ 1000000
-│  │  ├─ flatnode_decode_packet_prefix_table_safe_index  58.99 µs      │ 618.6 µs      │ 60.49 µs      │ 60.69 µs      │ 1000000 │ 1000000
-│  │  ├─ flatnode_decode_packet_traverse                 170.6 µs      │ 783.4 µs      │ 174.5 µs      │ 175.2 µs      │ 1000000 │ 1000000
-│  │  ├─ flatnode_decode_packet_traverse_safe_const      174.1 µs      │ 4.49 ms       │ 177 µs        │ 177.9 µs      │ 1000000 │ 1000000
-│  │  ├─ flatnode_decode_packet_traverse_safe_index      298.4 µs      │ 2.109 ms      │ 303.6 µs      │ 305.7 µs      │ 1000000 │ 1000000
-│  │  ├─ treenode_decode_packet_traverse                 172.3 µs      │ 749.3 µs      │ 175.6 µs      │ 176.1 µs      │ 1000000 │ 1000000
-│  │  ├─ treenode_decode_packet_traverse_baseline        335.1 µs      │ 2.385 ms      │ 345.9 µs      │ 349.5 µs      │ 1000000 │ 1000000
-│  │  ╰─ treenode_decode_packet_traverse_safe            290.5 µs      │ 813.9 µs      │ 300.5 µs      │ 300.7 µs      │ 1000000 │ 1000000
-│  ├─ decode_packet_group_large_medium                                 │               │               │               │         │
-│  │  ├─ flatnode_decode_packet_prefix_table             25.09 µs      │ 75.59 µs      │ 25.29 µs      │ 25.37 µs      │ 1000000 │ 1000000
-│  │  ├─ flatnode_decode_packet_prefix_table_safe_const  27.69 µs      │ 126.9 µs      │ 28.19 µs      │ 28.39 µs      │ 1000000 │ 1000000
-│  │  ├─ flatnode_decode_packet_prefix_table_safe_index  28.49 µs      │ 63.99 µs      │ 28.99 µs      │ 29.13 µs      │ 1000000 │ 1000000
-│  │  ├─ flatnode_decode_packet_traverse                 58.69 µs      │ 360.8 µs      │ 60.89 µs      │ 61.02 µs      │ 1000000 │ 1000000
-│  │  ├─ flatnode_decode_packet_traverse_safe_const      60.79 µs      │ 158 µs        │ 64.19 µs      │ 64.03 µs      │ 1000000 │ 1000000
-│  │  ├─ flatnode_decode_packet_traverse_safe_index      135.5 µs      │ 238.1 µs      │ 137.3 µs      │ 137.5 µs      │ 1000000 │ 1000000
-│  │  ├─ treenode_decode_packet_traverse                 62.19 µs      │ 452.1 µs      │ 64.09 µs      │ 64.21 µs      │ 1000000 │ 1000000
-│  │  ├─ treenode_decode_packet_traverse_baseline        155.1 µs      │ 306 µs        │ 162.8 µs      │ 163.5 µs      │ 1000000 │ 1000000
-│  │  ╰─ treenode_decode_packet_traverse_safe            132.4 µs      │ 248.4 µs      │ 137.3 µs      │ 136.9 µs      │ 1000000 │ 1000000
-│  ├─ decode_packet_group_medium                                       │               │               │               │         │
-│  │  ├─ flatnode_decode_packet_prefix_table             17.09 µs      │ 109 µs        │ 17.39 µs      │ 17.4 µs       │ 1000000 │ 1000000
-│  │  ├─ flatnode_decode_packet_prefix_table_safe_const  18.49 µs      │ 68.09 µs      │ 18.99 µs      │ 19.06 µs      │ 1000000 │ 1000000
-│  │  ├─ flatnode_decode_packet_prefix_table_safe_index  19.19 µs      │ 88.39 µs      │ 19.69 µs      │ 19.77 µs      │ 1000000 │ 1000000
-│  │  ├─ flatnode_decode_packet_traverse                 26.09 µs      │ 126.5 µs      │ 26.49 µs      │ 26.54 µs      │ 1000000 │ 1000000
-│  │  ├─ flatnode_decode_packet_traverse_safe_const      26.99 µs      │ 168.3 µs      │ 27.29 µs      │ 27.41 µs      │ 1000000 │ 1000000
-│  │  ├─ flatnode_decode_packet_traverse_safe_index      78.89 µs      │ 207.5 µs      │ 80.19 µs      │ 80.37 µs      │ 1000000 │ 1000000
-│  │  ├─ treenode_decode_packet_traverse                 26.69 µs      │ 120.4 µs      │ 26.99 µs      │ 27.1 µs       │ 1000000 │ 1000000
-│  │  ├─ treenode_decode_packet_traverse_baseline        98.89 µs      │ 208.5 µs      │ 107 µs        │ 106.1 µs      │ 1000000 │ 1000000
-│  │  ╰─ treenode_decode_packet_traverse_safe            75.59 µs      │ 397 µs        │ 78.79 µs      │ 78.62 µs      │ 1000000 │ 1000000
-│  ├─ decode_packet_group_medium_small                                 │               │               │               │         │
-│  │  ├─ flatnode_decode_packet_prefix_table             8.699 µs      │ 58.09 µs      │ 8.899 µs      │ 8.909 µs      │ 1000000 │ 1000000
-│  │  ├─ flatnode_decode_packet_prefix_table_safe_const  9.599 µs      │ 54.09 µs      │ 9.899 µs      │ 9.894 µs      │ 1000000 │ 1000000
-│  │  ├─ flatnode_decode_packet_prefix_table_safe_index  10.29 µs      │ 107.1 µs      │ 10.59 µs      │ 10.65 µs      │ 1000000 │ 1000000
-│  │  ├─ flatnode_decode_packet_traverse                 12.89 µs      │ 65.79 µs      │ 13.09 µs      │ 13.09 µs      │ 1000000 │ 1000000
-│  │  ├─ flatnode_decode_packet_traverse_safe_const      13.29 µs      │ 101.5 µs      │ 13.49 µs      │ 13.55 µs      │ 1000000 │ 1000000
-│  │  ├─ flatnode_decode_packet_traverse_safe_index      26.69 µs      │ 131.1 µs      │ 27.19 µs      │ 27.26 µs      │ 1000000 │ 1000000
-│  │  ├─ treenode_decode_packet_traverse                 13.39 µs      │ 55.79 µs      │ 13.59 µs      │ 13.67 µs      │ 1000000 │ 1000000
-│  │  ├─ treenode_decode_packet_traverse_baseline        41.89 µs      │ 150.4 µs      │ 48.99 µs      │ 48.43 µs      │ 1000000 │ 1000000
-│  │  ╰─ treenode_decode_packet_traverse_safe            25.69 µs      │ 114.1 µs      │ 26.39 µs      │ 26.41 µs      │ 1000000 │ 1000000
-│  ├─ decode_packet_group_small                                        │               │               │               │         │
-│  │  ├─ flatnode_decode_packet_prefix_table             5.099 µs      │ 66.79 µs      │ 5.299 µs      │ 5.266 µs      │ 1000000 │ 1000000
-│  │  ├─ flatnode_decode_packet_prefix_table_safe_const  5.549 µs      │ 53.44 µs      │ 5.699 µs      │ 5.694 µs      │ 1000000 │ 2000000
-│  │  ├─ flatnode_decode_packet_prefix_table_safe_index  6.399 µs      │ 39.39 µs      │ 6.599 µs      │ 6.66 µs       │ 1000000 │ 1000000
-│  │  ├─ flatnode_decode_packet_traverse                 7.599 µs      │ 54.09 µs      │ 7.799 µs      │ 7.793 µs      │ 1000000 │ 1000000
-│  │  ├─ flatnode_decode_packet_traverse_safe_const      7.799 µs      │ 2.012 ms      │ 7.899 µs      │ 7.96 µs       │ 1000000 │ 1000000
-│  │  ├─ flatnode_decode_packet_traverse_safe_index      17.89 µs      │ 111.8 µs      │ 18.29 µs      │ 18.27 µs      │ 1000000 │ 1000000
-│  │  ├─ treenode_decode_packet_traverse                 8.199 µs      │ 40.29 µs      │ 8.399 µs      │ 8.405 µs      │ 1000000 │ 1000000
-│  │  ├─ treenode_decode_packet_traverse_baseline        23.39 µs      │ 86.39 µs      │ 39.99 µs      │ 35.58 µs      │ 1000000 │ 1000000
-│  │  ╰─ treenode_decode_packet_traverse_safe            16.89 µs      │ 52.49 µs      │ 17.39 µs      │ 17.37 µs      │ 1000000 │ 1000000
-│  ╰─ decode_packet_group_small_min                                    │               │               │               │         │
-│     ├─ flatnode_decode_packet_prefix_table             1.037 µs      │ 6.974 µs      │ 1.062 µs      │ 1.066 µs      │ 1000000 │ 8000000
-│     ├─ flatnode_decode_packet_prefix_table_safe_const  1.074 µs      │ 6.724 µs      │ 1.099 µs      │ 1.103 µs      │ 1000000 │ 8000000
-│     ├─ flatnode_decode_packet_prefix_table_safe_index  1.949 µs      │ 19.04 µs      │ 2.049 µs      │ 2.06 µs       │ 1000000 │ 2000000
-│     ├─ flatnode_decode_packet_traverse                 235.6 ns      │ 1.904 µs      │ 241.9 ns      │ 242.1 ns      │ 1000000 │ 64000000
-│     ├─ flatnode_decode_packet_traverse_safe_const      241.9 ns      │ 2.009 µs      │ 248.1 ns      │ 248 ns        │ 1000000 │ 64000000
-│     ├─ flatnode_decode_packet_traverse_safe_index      262.2 ns      │ 3.412 µs      │ 274.7 ns      │ 274.2 ns      │ 1000000 │ 32000000
-│     ├─ treenode_decode_packet_traverse                 618.5 ns      │ 2.587 µs      │ 643.5 ns      │ 646.8 ns      │ 1000000 │ 16000000
-│     ├─ treenode_decode_packet_traverse_baseline        699.7 ns      │ 2.899 µs      │ 724.7 ns      │ 726.6 ns      │ 1000000 │ 16000000
-│     ╰─ treenode_decode_packet_traverse_safe            668.5 ns      │ 6.999 µs      │ 687.2 ns      │ 690.7 ns      │ 1000000 │ 16000000
-├─ min_heap                                                            │               │               │               │         │
-│  ╰─ common                                                           │               │               │               │         │
-│     ├─ alloc                                                         │               │               │               │         │
-│     │  ├─ FlatNodeSafe                                 11.86 ns      │ 130.4 ns      │ 12.06 ns      │ 12.2 ns       │ 10000   │ 5120000
-│     │  ╰─ TreeNode                                     13.04 ns      │ 76.71 ns      │ 13.43 ns      │ 13.45 ns      │ 10000   │ 2560000
-│     ├─ pop                                                           │               │               │               │         │
-│     │  ├─ FlatNodeSafe                                 0.406 ns      │ 1.719 ns      │ 0.406 ns      │ 0.412 ns      │ 10000   │ 163840000
-│     │  ╰─ TreeNode                                     0.117 ns      │ 0.623 ns      │ 0.12 ns       │ 0.125 ns      │ 10000   │ 327680000
-│     ├─ push                                                          │               │               │               │         │
-│     │  ├─ FlatNodeSafe                                 24.76 ns      │ 174 µs        │ 49.76 ns      │ 109.5 ns      │ 10000   │ 80000
-│     │  ╰─ TreeNode                                     49.76 ns      │ 187.2 µs      │ 99.76 ns      │ 145.6 ns      │ 10000   │ 20000
-│     ╰─ roundtrip                                                     │               │               │               │         │
-│        ├─ FlatNodeSafe                                 73.97 ns      │ 289.6 ns      │ 79.44 ns      │ 79.93 ns      │ 10000   │ 1280000
-│        ╰─ TreeNode                                     154.4 ns      │ 579.4 ns      │ 160.6 ns      │ 161.6 ns      │ 10000   │ 640000
-╰─ packet                                                              │               │               │               │         │
-   ├─ common                                                           │               │               │               │         │
-   │  ├─ packet_from_content                                           │               │               │               │         │
-   │  │  ├─ large (msg_len=70.5k)                        2.494 ns      │ 4.349 ns      │ 2.518 ns      │ 2.541 ns      │ 10000   │ 40960000
-   │  │  ╰─ small_min (msg_len=40b)                      2.494 ns      │ 17.33 ns      │ 2.518 ns      │ 2.55 ns       │ 10000   │ 40960000
-   │  ├─ symbols_table                                                 │               │               │               │         │
-   │  │  ├─ large (msg_len=70.5k)                        22.22 ns      │ 163.2 ns      │ 22.8 ns       │ 23.01 ns      │ 10000   │ 5120000
-   │  │  ╰─ small_min (msg_len=40b)                      22.22 ns      │ 69.68 ns      │ 22.8 ns       │ 22.94 ns      │ 10000   │ 5120000
-   │  ├─ prefix_map                                                    │               │               │               │         │
-   │  │  ├─ FlatNode                                                   │               │               │               │         │
-   │  │  │  ├─ large (msg_len=70.5k)                     887.2 ns      │ 3.749 µs      │ 937.2 ns      │ 944.9 ns      │ 10000   │ 80000
-   │  │  │  ╰─ small_min (msg_len=40b)                   887.2 ns      │ 3.024 µs      │ 924.7 ns      │ 928.7 ns      │ 10000   │ 160000
-   │  │  ╰─ TreeNode                                                   │               │               │               │         │
-   │  │     ├─ large (msg_len=70.5k)                     899.7 ns      │ 6.724 µs      │ 962.2 ns      │ 968.4 ns      │ 10000   │ 80000
-   │  │     ╰─ small_min (msg_len=40b)                   887.2 ns      │ 2.893 µs      │ 924.7 ns      │ 926.6 ns      │ 10000   │ 160000
-   │  ├─ symbols_heap                                                  │               │               │               │         │
-   │  │  ├─ FlatNodeSafe                                               │               │               │               │         │
-   │  │  │  ├─ large (msg_len=70.5k)                     43.9 ns       │ 134.9 ns      │ 52.88 ns      │ 52.55 ns      │ 10000   │ 2560000
-   │  │  │  ╰─ small_min (msg_len=40b)                   37.65 ns      │ 194.2 ns      │ 40.38 ns      │ 41.43 ns      │ 10000   │ 2560000
-   │  │  ╰─ TreeNode                                                   │               │               │               │         │
-   │  │     ├─ large (msg_len=70.5k)                     119.2 ns      │ 322.4 ns      │ 121.6 ns      │ 122 ns        │ 10000   │ 1280000
-   │  │     ╰─ small_min (msg_len=40b)                   102.1 ns      │ 392.7 ns      │ 103.6 ns      │ 104.2 ns      │ 10000   │ 1280000
-   │  ╰─ tree                                                          │               │               │               │         │
-   │     ├─ FlatNode                                                   │               │               │               │         │
-   │     │  ├─ large (msg_len=70.5k)                     170 ns        │ 381 ns        │ 179.4 ns      │ 180.3 ns      │ 10000   │ 640000
-   │     │  ╰─ small_min (msg_len=40b)                   157.5 ns      │ 660.6 ns      │ 170 ns        │ 169.3 ns      │ 10000   │ 640000
-   │     ├─ FlatNodeSafe                                               │               │               │               │         │
-   │     │  ├─ large (msg_len=70.5k)                     157.5 ns      │ 382.5 ns      │ 174.7 ns      │ 175 ns        │ 10000   │ 640000
-   │     │  ╰─ small_min (msg_len=40b)                   141.1 ns      │ 252.1 ns      │ 150.5 ns      │ 150.3 ns      │ 10000   │ 1280000
-   │     ╰─ TreeNode                                                   │               │               │               │         │
-   │        ├─ large (msg_len=70.5k)                     574.7 ns      │ 1.587 µs      │ 590.3 ns      │ 594.7 ns      │ 10000   │ 320000
-   │        ╰─ small_min (msg_len=40b)                   537.2 ns      │ 3.168 µs      │ 562.2 ns      │ 562 ns        │ 10000   │ 160000
-   ╰─ flatnode_multi_symbol                                            │               │               │               │         │
-      ╰─ prefix_table                                                  │               │               │               │         │
-         ├─ FlatNode                                                   │               │               │               │         │
-         │  ├─ large (msg_len=70.5k)                     856 ns        │ 1.799 µs      │ 893.5 ns      │ 892.1 ns      │ 10000   │ 160000
-         │  ╰─ small_min (msg_len=40b)                   799.7 ns      │ 3.649 µs      │ 824.7 ns      │ 832.8 ns      │ 10000   │ 80000
-         ╰─ FlatNodeSafe                                               │               │               │               │         │
-            ├─ large (msg_len=70.5k)                     1.749 µs      │ 4.962 µs      │ 1.787 µs      │ 1.788 µs      │ 10000   │ 80000
-            ╰─ small_min (msg_len=40b)                   1.799 µs      │ 3.612 µs      │ 1.824 µs      │ 1.832 µs      │ 10000   │ 80000
+baseline                                  fastest       │ slowest       │ median        │ mean          │ samples │ iters
+╰─ decoder                                              │               │               │               │         │
+   ╰─ bench                                             │               │               │               │         │
+      ├─ decode_message                                 │               │               │               │         │
+      │  ├─ large (msg_len=70.5k)         333.7 µs      │ 2.74 ms       │ 346.4 µs      │ 349.6 µs      │ 1000000 │ 1000000
+      │  │                                211.4 MB/s    │ 25.75 MB/s    │ 203.6 MB/s    │ 201.8 MB/s    │         │
+      │  ├─ large_medium (msg_len=33.3k)  153.4 µs      │ 1.14 ms       │ 159.9 µs      │ 159.3 µs      │ 1000000 │ 1000000
+      │  │                                217.1 MB/s    │ 29.22 MB/s    │ 208.3 MB/s    │ 209.1 MB/s    │         │
+      │  ├─ medium (msg_len=22.5k)        96.99 µs      │ 1.031 ms      │ 103.6 µs      │ 104.3 µs      │ 1000000 │ 1000000
+      │  │                                232.4 MB/s    │ 21.85 MB/s    │ 217.4 MB/s    │ 216.1 MB/s    │         │
+      │  ├─ medium_small (msg_len=11.1k)  40.89 µs      │ 385 µs        │ 42.99 µs      │ 43.22 µs      │ 1000000 │ 1000000
+      │  │                                273.1 MB/s    │ 29.01 MB/s    │ 259.8 MB/s    │ 258.4 MB/s    │         │
+      │  ├─ small (msg_len=5.5k)          21.89 µs      │ 99.59 µs      │ 33.39 µs      │ 30.54 µs      │ 1000000 │ 1000000
+      │  │                                253.7 MB/s    │ 55.79 MB/s    │ 166.3 MB/s    │ 181.9 MB/s    │         │
+      │  ╰─ small_min (msg_len=40b)       145 ns        │ 721.6 ns      │ 148.1 ns      │ 149.8 ns      │ 1000000 │ 64000000
+      │                                   275.7 MB/s    │ 55.43 MB/s    │ 269.9 MB/s    │ 266.9 MB/s    │         │
+      ╰─ decode_packet                                  │               │               │               │         │
+         ├─ large (msg_len=70.5k)         334.5 µs      │ 1.583 ms      │ 354.6 µs      │ 352.7 µs      │ 1000000 │ 1000000
+         ├─ large_medium (msg_len=33.3k)  154.2 µs      │ 717.2 µs      │ 161.4 µs      │ 162 µs        │ 1000000 │ 1000000
+         ├─ medium (msg_len=22.5k)        99.19 µs      │ 163.7 µs      │ 106.6 µs      │ 106 µs        │ 1000000 │ 1000000
+         ├─ medium_small (msg_len=11.1k)  41.99 µs      │ 113.6 µs      │ 44.19 µs      │ 44.2 µs       │ 1000000 │ 1000000
+         ├─ small (msg_len=5.5k)          22.39 µs      │ 146.9 µs      │ 25.09 µs      │ 30.58 µs      │ 1000000 │ 1000000
+         ╰─ small_min (msg_len=40b)       662.2 ns      │ 3.212 µs      │ 693.4 ns      │ 695.9 ns      │ 1000000 │ 16000000
+
+common                                    fastest       │ slowest       │ median        │ mean          │ samples │ iters
+╰─ packet                                               │               │               │               │         │
+   ╰─ benches                                           │               │               │               │         │
+      ├─ packet_from_content                            │               │               │               │         │
+      │  ├─ large (msg_len=70.5k)         2.464 ns      │ 5.564 ns      │ 2.513 ns      │ 2.551 ns      │ 10000   │ 40960000
+      │  ╰─ small_min (msg_len=40b)       2.464 ns      │ 10.93 ns      │ 2.488 ns      │ 2.517 ns      │ 10000   │ 40960000
+      ╰─ symbols_table                                  │               │               │               │         │
+         ├─ large (msg_len=70.5k)         22.97 ns      │ 91.91 ns      │ 23.55 ns      │ 23.59 ns      │ 10000   │ 5120000
+         ╰─ small_min (msg_len=40b)       22.77 ns      │ 66.33 ns      │ 23.55 ns      │ 23.64 ns      │ 10000   │ 5120000
+
+flat_index                                fastest       │ slowest       │ median        │ mean          │ samples │ iters
+╰─ decoder                                              │               │               │               │         │
+   ╰─ bench                                             │               │               │               │         │
+      ├─ decode_message                                 │               │               │               │         │
+      │  ├─ large (msg_len=70.5k)         294.1 µs      │ 2.315 ms      │ 298.3 µs      │ 299.4 µs      │ 1000000 │ 1000000
+      │  │                                239.9 MB/s    │ 30.47 MB/s    │ 236.5 MB/s    │ 235.7 MB/s    │         │
+      │  ├─ large_medium (msg_len=33.3k)  132.8 µs      │ 224.1 µs      │ 134.6 µs      │ 134.9 µs      │ 1000000 │ 1000000
+      │  │                                250.7 MB/s    │ 148.6 MB/s    │ 247.4 MB/s    │ 246.9 MB/s    │         │
+      │  ├─ medium (msg_len=22.5k)        75.59 µs      │ 248 µs        │ 77.09 µs      │ 77.2 µs       │ 1000000 │ 1000000
+      │  │                                298.2 MB/s    │ 90.88 MB/s    │ 292.4 MB/s    │ 292 MB/s      │         │
+      │  ├─ medium_small (msg_len=11.1k)  25.69 µs      │ 76.49 µs      │ 26.19 µs      │ 26.22 µs      │ 1000000 │ 1000000
+      │  │                                434.7 MB/s    │ 146 MB/s      │ 426.4 MB/s    │ 426 MB/s      │         │
+      │  ├─ small (msg_len=5.5k)          16.69 µs      │ 50.89 µs      │ 16.99 µs      │ 16.98 µs      │ 1000000 │ 1000000
+      │  │                                332.7 MB/s    │ 109.1 MB/s    │ 326.8 MB/s    │ 327 MB/s      │         │
+      │  ╰─ small_min (msg_len=40b)       116.9 ns      │ 848.1 ns      │ 122.3 ns      │ 122.6 ns      │ 1000000 │ 128000000
+      │                                   342.1 MB/s    │ 47.16 MB/s    │ 326.8 MB/s    │ 326 MB/s      │         │
+      ╰─ decode_packet                                  │               │               │               │         │
+         ├─ large (msg_len=70.5k)         294.7 µs      │ 2.256 ms      │ 298.5 µs      │ 299 µs        │ 1000000 │ 1000000
+         ├─ large_medium (msg_len=33.3k)  133.1 µs      │ 285.8 µs      │ 135.1 µs      │ 135.4 µs      │ 1000000 │ 1000000
+         ├─ medium (msg_len=22.5k)        75.49 µs      │ 192.2 µs      │ 76.79 µs      │ 76.95 µs      │ 1000000 │ 1000000
+         ├─ medium_small (msg_len=11.1k)  25.99 µs      │ 120.2 µs      │ 26.39 µs      │ 26.45 µs      │ 1000000 │ 1000000
+         ├─ small (msg_len=5.5k)          16.69 µs      │ 74.79 µs      │ 17.09 µs      │ 17.11 µs      │ 1000000 │ 1000000
+         ╰─ small_min (msg_len=40b)       224.7 ns      │ 810.6 ns      │ 235.6 ns      │ 236.7 ns      │ 1000000 │ 64000000
+
+flat_ptr                                  fastest       │ slowest       │ median        │ mean          │ samples │ iters
+╰─ decoder                                              │               │               │               │         │
+   ╰─ bench                                             │               │               │               │         │
+      ├─ decode_message                                 │               │               │               │         │
+      │  ├─ large (msg_len=70.5k)         177.9 µs      │ 508.9 µs      │ 180.9 µs      │ 181.3 µs      │ 1000000 │ 1000000
+      │  │                                396.5 MB/s    │ 138.6 MB/s    │ 389.9 MB/s    │ 389 MB/s      │         │
+      │  ├─ large_medium (msg_len=33.3k)  64.79 µs      │ 154.3 µs      │ 67.09 µs      │ 67.23 µs      │ 1000000 │ 1000000
+      │  │                                514.3 MB/s    │ 215.8 MB/s    │ 496.6 MB/s    │ 495.6 MB/s    │         │
+      │  ├─ medium (msg_len=22.5k)        28.79 µs      │ 136.4 µs      │ 29.09 µs      │ 29.21 µs      │ 1000000 │ 1000000
+      │  │                                782.9 MB/s    │ 165.1 MB/s    │ 774.8 MB/s    │ 771.7 MB/s    │         │
+      │  ├─ medium_small (msg_len=11.1k)  14.09 µs      │ 105.9 µs      │ 14.29 µs      │ 14.31 µs      │ 1000000 │ 1000000
+      │  │                                792.3 MB/s    │ 105.3 MB/s    │ 781.2 MB/s    │ 780.4 MB/s    │         │
+      │  ├─ small (msg_len=5.5k)          8.099 µs      │ 43.89 µs      │ 8.199 µs      │ 8.268 µs      │ 1000000 │ 1000000
+      │  │                                686 MB/s      │ 126.5 MB/s    │ 677.7 MB/s    │ 672 MB/s      │         │
+      │  ╰─ small_min (msg_len=40b)       88.01 ns      │ 443.4 ns      │ 91.13 ns      │ 91.05 ns      │ 1000000 │ 128000000
+      │                                   454.4 MB/s    │ 90.19 MB/s    │ 438.9 MB/s    │ 439.2 MB/s    │         │
+      ╰─ decode_packet                                  │               │               │               │         │
+         ├─ large (msg_len=70.5k)         177.3 µs      │ 956.2 µs      │ 180.6 µs      │ 181.1 µs      │ 1000000 │ 1000000
+         ├─ large_medium (msg_len=33.3k)  64.59 µs      │ 121.4 µs      │ 67.59 µs      │ 67.62 µs      │ 1000000 │ 1000000
+         ├─ medium (msg_len=22.5k)        28.99 µs      │ 214.5 µs      │ 29.49 µs      │ 29.57 µs      │ 1000000 │ 1000000
+         ├─ medium_small (msg_len=11.1k)  14.19 µs      │ 89.59 µs      │ 14.49 µs      │ 14.55 µs      │ 1000000 │ 1000000
+         ├─ small (msg_len=5.5k)          8.199 µs      │ 48.29 µs      │ 8.399 µs      │ 8.435 µs      │ 1000000 │ 1000000
+         ╰─ small_min (msg_len=40b)       221.6 ns      │ 1.33 µs       │ 227.8 ns      │ 228.9 ns      │ 1000000 │ 32000000
+
+flat_unsafe_ptr                           fastest       │ slowest       │ median        │ mean          │ samples │ iters
+╰─ decoder                                              │               │               │               │         │
+   ╰─ bench                                             │               │               │               │         │
+      ├─ decode_message                                 │               │               │               │         │
+      │  ├─ large (msg_len=70.5k)         172.2 µs      │ 441.9 µs      │ 175.4 µs      │ 176.3 µs      │ 1000000 │ 1000000
+      │  │                                409.6 MB/s    │ 159.6 MB/s    │ 402.1 MB/s    │ 400.2 MB/s    │         │
+      │  ├─ large_medium (msg_len=33.3k)  58.79 µs      │ 164.1 µs      │ 60.99 µs      │ 61.06 µs      │ 1000000 │ 1000000
+      │  │                                566.8 MB/s    │ 202.9 MB/s    │ 546.3 MB/s    │ 545.7 MB/s    │         │
+      │  ├─ medium (msg_len=22.5k)        25.99 µs      │ 94.29 µs      │ 26.29 µs      │ 26.34 µs      │ 1000000 │ 1000000
+      │  │                                867.2 MB/s    │ 239.1 MB/s    │ 857.3 MB/s    │ 855.8 MB/s    │         │
+      │  ├─ medium_small (msg_len=11.1k)  12.69 µs      │ 62.99 µs      │ 12.89 µs      │ 12.97 µs      │ 1000000 │ 1000000
+      │  │                                879.7 MB/s    │ 177.3 MB/s    │ 866 MB/s      │ 861.1 MB/s    │         │
+      │  ├─ small (msg_len=5.5k)          7.499 µs      │ 42.29 µs      │ 7.699 µs      │ 7.673 µs      │ 1000000 │ 1000000
+      │  │                                740.9 MB/s    │ 131.3 MB/s    │ 721.7 MB/s    │ 724.1 MB/s    │         │
+      │  ╰─ small_min (msg_len=40b)       77.85 ns      │ 513 ns        │ 79.41 ns      │ 79.75 ns      │ 1000000 │ 128000000
+      │                                   513.7 MB/s    │ 77.97 MB/s    │ 503.6 MB/s    │ 501.5 MB/s    │         │
+      ╰─ decode_packet                                  │               │               │               │         │
+         ├─ large (msg_len=70.5k)         172.9 µs      │ 656.9 µs      │ 176.1 µs      │ 176.8 µs      │ 1000000 │ 1000000
+         ├─ large_medium (msg_len=33.3k)  59.09 µs      │ 140 µs        │ 61.19 µs      │ 61.35 µs      │ 1000000 │ 1000000
+         ├─ medium (msg_len=22.5k)        26.09 µs      │ 118.2 µs      │ 26.39 µs      │ 26.53 µs      │ 1000000 │ 1000000
+         ├─ medium_small (msg_len=11.1k)  12.89 µs      │ 51.99 µs      │ 13.09 µs      │ 13.14 µs      │ 1000000 │ 1000000
+         ├─ small (msg_len=5.5k)          7.699 µs      │ 54.39 µs      │ 7.799 µs      │ 7.834 µs      │ 1000000 │ 1000000
+         ╰─ small_min (msg_len=40b)       215.3 ns      │ 840.3 ns      │ 223.1 ns      │ 223.2 ns      │ 1000000 │ 64000000
+
+nested_box                                fastest       │ slowest       │ median        │ mean          │ samples │ iters
+╰─ decoder                                              │               │               │               │         │
+   ╰─ bench                                             │               │               │               │         │
+      ├─ decode_message                                 │               │               │               │         │
+      │  ├─ large (msg_len=70.5k)         288.5 µs      │ 476.8 µs      │ 297.8 µs      │ 298.2 µs      │ 1000000 │ 1000000
+      │  │                                244.5 MB/s    │ 147.9 MB/s    │ 236.9 MB/s    │ 236.6 MB/s    │         │
+      │  ├─ large_medium (msg_len=33.3k)  130 µs        │ 763.6 µs      │ 133.4 µs      │ 133.6 µs      │ 1000000 │ 1000000
+      │  │                                256.1 MB/s    │ 43.64 MB/s    │ 249.6 MB/s    │ 249.3 MB/s    │         │
+      │  ├─ medium (msg_len=22.5k)        74.39 µs      │ 974.5 µs      │ 77.29 µs      │ 77.36 µs      │ 1000000 │ 1000000
+      │  │                                303 MB/s      │ 23.13 MB/s    │ 291.7 MB/s    │ 291.4 MB/s    │         │
+      │  ├─ medium_small (msg_len=11.1k)  24.69 µs      │ 71.99 µs      │ 25.49 µs      │ 25.53 µs      │ 1000000 │ 1000000
+      │  │                                452.3 MB/s    │ 155.1 MB/s    │ 438.1 MB/s    │ 437.5 MB/s    │         │
+      │  ├─ small (msg_len=5.5k)          16.19 µs      │ 50.29 µs      │ 16.59 µs      │ 16.58 µs      │ 1000000 │ 1000000
+      │  │                                343 MB/s      │ 110.4 MB/s    │ 334.7 MB/s    │ 335.1 MB/s    │         │
+      │  ╰─ small_min (msg_len=40b)       107.5 ns      │ 516.1 ns      │ 113 ns        │ 112.9 ns      │ 1000000 │ 128000000
+      │                                   371.9 MB/s    │ 77.49 MB/s    │ 353.9 MB/s    │ 354 MB/s      │         │
+      ╰─ decode_packet                                  │               │               │               │         │
+         ├─ large (msg_len=70.5k)         289.3 µs      │ 796.1 µs      │ 297.2 µs      │ 297.7 µs      │ 1000000 │ 1000000
+         ├─ large_medium (msg_len=33.3k)  130.1 µs      │ 594.7 µs      │ 134 µs        │ 134.2 µs      │ 1000000 │ 1000000
+         ├─ medium (msg_len=22.5k)        75.29 µs      │ 137.3 µs      │ 77.39 µs      │ 77.66 µs      │ 1000000 │ 1000000
+         ├─ medium_small (msg_len=11.1k)  25.19 µs      │ 97.69 µs      │ 25.99 µs      │ 26.02 µs      │ 1000000 │ 1000000
+         ├─ small (msg_len=5.5k)          16.79 µs      │ 64.79 µs      │ 17.29 µs      │ 17.36 µs      │ 1000000 │ 1000000
+         ╰─ small_min (msg_len=40b)       624.7 ns      │ 3.83 µs       │ 643.4 ns      │ 648 ns        │ 1000000 │ 16000000
+
+nested_unsafe_box                         fastest       │ slowest       │ median        │ mean          │ samples │ iters
+╰─ decoder                                              │               │               │               │         │
+   ╰─ bench                                             │               │               │               │         │
+      ├─ decode_message                                 │               │               │               │         │
+      │  ├─ large (msg_len=70.5k)         171.9 µs      │ 254.6 µs      │ 175 µs        │ 175.5 µs      │ 1000000 │ 1000000
+      │  │                                410.3 MB/s    │ 277.1 MB/s    │ 403 MB/s      │ 402 MB/s      │         │
+      │  ├─ large_medium (msg_len=33.3k)  59.09 µs      │ 312.1 µs      │ 61.09 µs      │ 61.56 µs      │ 1000000 │ 1000000
+      │  │                                563.9 MB/s    │ 106.7 MB/s    │ 545.4 MB/s    │ 541.3 MB/s    │         │
+      │  ├─ medium (msg_len=22.5k)        26.09 µs      │ 118.4 µs      │ 26.39 µs      │ 26.46 µs      │ 1000000 │ 1000000
+      │  │                                863.9 MB/s    │ 190.2 MB/s    │ 854.1 MB/s    │ 852 MB/s      │         │
+      │  ├─ medium_small (msg_len=11.1k)  12.79 µs      │ 75.49 µs      │ 12.99 µs      │ 13.06 µs      │ 1000000 │ 1000000
+      │  │                                872.8 MB/s    │ 147.9 MB/s    │ 859.4 MB/s    │ 855.3 MB/s    │         │
+      │  ├─ small (msg_len=5.5k)          7.599 µs      │ 123.1 µs      │ 7.799 µs      │ 7.774 µs      │ 1000000 │ 1000000
+      │  │                                731.2 MB/s    │ 45.1 MB/s     │ 712.4 MB/s    │ 714.7 MB/s    │         │
+      │  ╰─ small_min (msg_len=40b)       78.63 ns      │ 343.4 ns      │ 80.19 ns      │ 80.25 ns      │ 1000000 │ 128000000
+      │                                   508.6 MB/s    │ 116.4 MB/s    │ 498.7 MB/s    │ 498.4 MB/s    │         │
+      ╰─ decode_packet                                  │               │               │               │         │
+         ├─ large (msg_len=70.5k)         172.5 µs      │ 374.6 µs      │ 175.6 µs      │ 176 µs        │ 1000000 │ 1000000
+         ├─ large_medium (msg_len=33.3k)  60.19 µs      │ 384 µs        │ 65.49 µs      │ 65.33 µs      │ 1000000 │ 1000000
+         ├─ medium (msg_len=22.5k)        26.69 µs      │ 98.09 µs      │ 26.99 µs      │ 27.11 µs      │ 1000000 │ 1000000
+         ├─ medium_small (msg_len=11.1k)  13.39 µs      │ 135.2 µs      │ 13.59 µs      │ 13.67 µs      │ 1000000 │ 1000000
+         ├─ small (msg_len=5.5k)          8.199 µs      │ 53.89 µs      │ 8.399 µs      │ 8.387 µs      │ 1000000 │ 1000000
+         ╰─ small_min (msg_len=40b)       593.4 ns      │ 2.637 µs      │ 612.2 ns      │ 614.1 ns      │ 1000000 │ 16000000
+
+table_index                               fastest       │ slowest       │ median        │ mean          │ samples │ iters
+╰─ decoder                                              │               │               │               │         │
+   ╰─ bench                                             │               │               │               │         │
+      ├─ decode_message                                 │               │               │               │         │
+      │  ├─ large (msg_len=70.5k)         54.59 µs      │ 157.1 µs      │ 55.09 µs      │ 55.23 µs      │ 1000000 │ 1000000
+      │  │                                1.292 GB/s    │ 448.9 MB/s    │ 1.28 GB/s     │ 1.277 GB/s    │         │
+      │  ├─ large_medium (msg_len=33.3k)  25.49 µs      │ 85.59 µs      │ 25.79 µs      │ 25.86 µs      │ 1000000 │ 1000000
+      │  │                                1.306 GB/s    │ 389.3 MB/s    │ 1.291 GB/s    │ 1.288 GB/s    │         │
+      │  ├─ medium (msg_len=22.5k)        16.69 µs      │ 114.2 µs      │ 16.89 µs      │ 16.91 µs      │ 1000000 │ 1000000
+      │  │                                1.35 GB/s     │ 197.2 MB/s    │ 1.334 GB/s    │ 1.333 GB/s    │         │
+      │  ├─ medium_small (msg_len=11.1k)  8.099 µs      │ 539.9 µs      │ 8.299 µs      │ 8.288 µs      │ 1000000 │ 1000000
+      │  │                                1.379 GB/s    │ 20.68 MB/s    │ 1.346 GB/s    │ 1.347 GB/s    │         │
+      │  ├─ small (msg_len=5.5k)          4.424 µs      │ 127.5 µs      │ 4.474 µs      │ 4.487 µs      │ 1000000 │ 4000000
+      │  │                                1.255 GB/s    │ 43.55 MB/s    │ 1.241 GB/s    │ 1.238 GB/s    │         │
+      │  ╰─ small_min (msg_len=40b)       66.91 ns      │ 430.9 ns      │ 68.48 ns      │ 68.42 ns      │ 1000000 │ 128000000
+      │                                   597.7 MB/s    │ 92.81 MB/s    │ 584.1 MB/s    │ 584.6 MB/s    │         │
+      ╰─ decode_packet                                  │               │               │               │         │
+         ├─ large (msg_len=70.5k)         56.29 µs      │ 554.2 µs      │ 56.79 µs      │ 56.99 µs      │ 1000000 │ 1000000
+         ├─ large_medium (msg_len=33.3k)  27.09 µs      │ 100.3 µs      │ 27.49 µs      │ 27.53 µs      │ 1000000 │ 1000000
+         ├─ medium (msg_len=22.5k)        18.39 µs      │ 2.01 ms       │ 18.59 µs      │ 18.64 µs      │ 1000000 │ 1000000
+         ├─ medium_small (msg_len=11.1k)  9.799 µs      │ 184.4 µs      │ 9.999 µs      │ 9.995 µs      │ 1000000 │ 1000000
+         ├─ small (msg_len=5.5k)          6.199 µs      │ 38.39 µs      │ 6.399 µs      │ 6.364 µs      │ 1000000 │ 1000000
+         ╰─ small_min (msg_len=40b)       1.862 µs      │ 6.199 µs      │ 1.924 µs      │ 1.921 µs      │ 1000000 │ 8000000
+
+table_ptr                                 fastest       │ slowest       │ median        │ mean          │ samples │ iters
+╰─ decoder                                              │               │               │               │         │
+   ╰─ bench                                             │               │               │               │         │
+      ├─ decode_message                                 │               │               │               │         │
+      │  ├─ large (msg_len=70.5k)         55.19 µs      │ 194.8 µs      │ 55.69 µs      │ 55.86 µs      │ 1000000 │ 1000000
+      │  │                                1.278 GB/s    │ 362.1 MB/s    │ 1.267 GB/s    │ 1.263 GB/s    │         │
+      │  ├─ large_medium (msg_len=33.3k)  25.69 µs      │ 132.9 µs      │ 26.09 µs      │ 26.13 µs      │ 1000000 │ 1000000
+      │  │                                1.296 GB/s    │ 250.5 MB/s    │ 1.276 GB/s    │ 1.275 GB/s    │         │
+      │  ├─ medium (msg_len=22.5k)        16.79 µs      │ 52.19 µs      │ 16.99 µs      │ 17.01 µs      │ 1000000 │ 1000000
+      │  │                                1.342 GB/s    │ 431.9 MB/s    │ 1.326 GB/s    │ 1.324 GB/s    │         │
+      │  ├─ medium_small (msg_len=11.1k)  8.199 µs      │ 47.99 µs      │ 8.299 µs      │ 8.34 µs       │ 1000000 │ 1000000
+      │  │                                1.362 GB/s    │ 232.7 MB/s    │ 1.346 GB/s    │ 1.339 GB/s    │         │
+      │  ├─ small (msg_len=5.5k)          4.499 µs      │ 84.89 µs      │ 4.649 µs      │ 4.633 µs      │ 1000000 │ 2000000
+      │  │                                1.234 GB/s    │ 65.45 MB/s    │ 1.195 GB/s    │ 1.199 GB/s    │         │
+      │  ╰─ small_min (msg_len=40b)       66.91 ns      │ 351.2 ns      │ 68.48 ns      │ 68.44 ns      │ 1000000 │ 128000000
+      │                                   597.7 MB/s    │ 113.8 MB/s    │ 584.1 MB/s    │ 584.4 MB/s    │         │
+      ╰─ decode_packet                                  │               │               │               │         │
+         ├─ large (msg_len=70.5k)         56.29 µs      │ 164.8 µs      │ 56.79 µs      │ 56.97 µs      │ 1000000 │ 1000000
+         ├─ large_medium (msg_len=33.3k)  26.79 µs      │ 388.8 µs      │ 27.09 µs      │ 27.2 µs       │ 1000000 │ 1000000
+         ├─ medium (msg_len=22.5k)        17.79 µs      │ 55.89 µs      │ 18.09 µs      │ 18.1 µs       │ 1000000 │ 1000000
+         ├─ medium_small (msg_len=11.1k)  9.199 µs      │ 42.29 µs      │ 9.399 µs      │ 9.386 µs      │ 1000000 │ 1000000
+         ├─ small (msg_len=5.5k)          5.499 µs      │ 24.09 µs      │ 5.649 µs      │ 5.638 µs      │ 1000000 │ 2000000
+         ╰─ small_min (msg_len=40b)       999.7 ns      │ 7.055 µs      │ 1.018 µs      │ 1.024 µs      │ 1000000 │ 16000000
+
+table_unsafe_ptr                          fastest       │ slowest       │ median        │ mean          │ samples │ iters
+╰─ decoder                                              │               │               │               │         │
+   ╰─ bench                                             │               │               │               │         │
+      ├─ decode_message                                 │               │               │               │         │
+      │  ├─ large (msg_len=70.5k)         51.59 µs      │ 151.3 µs      │ 52.09 µs      │ 52.23 µs      │ 1000000 │ 1000000
+      │  │                                1.367 GB/s    │ 466.1 MB/s    │ 1.354 GB/s    │ 1.351 GB/s    │         │
+      │  ├─ large_medium (msg_len=33.3k)  23.99 µs      │ 341.7 µs      │ 24.29 µs      │ 24.32 µs      │ 1000000 │ 1000000
+      │  │                                1.388 GB/s    │ 97.5 MB/s     │ 1.371 GB/s    │ 1.37 GB/s     │         │
+      │  ├─ medium (msg_len=22.5k)        15.99 µs      │ 49.89 µs      │ 16.29 µs      │ 16.29 µs      │ 1000000 │ 1000000
+      │  │                                1.409 GB/s    │ 451.8 MB/s    │ 1.383 GB/s    │ 1.383 GB/s    │         │
+      │  ├─ medium_small (msg_len=11.1k)  7.599 µs      │ 54.49 µs      │ 7.799 µs      │ 7.779 µs      │ 1000000 │ 1000000
+      │  │                                1.47 GB/s     │ 204.9 MB/s    │ 1.432 GB/s    │ 1.436 GB/s    │         │
+      │  ├─ small (msg_len=5.5k)          4.099 µs      │ 265.4 µs      │ 4.199 µs      │ 4.189 µs      │ 1000000 │ 2000000
+      │  │                                1.355 GB/s    │ 20.93 MB/s    │ 1.323 GB/s    │ 1.326 GB/s    │         │
+      │  ╰─ small_min (msg_len=40b)       63.01 ns      │ 628.6 ns      │ 63.79 ns      │ 64.11 ns      │ 1000000 │ 128000000
+      │                                   634.8 MB/s    │ 63.62 MB/s    │ 627 MB/s      │ 623.9 MB/s    │         │
+      ╰─ decode_packet                                  │               │               │               │         │
+         ├─ large (msg_len=70.5k)         52.69 µs      │ 209.3 µs      │ 53.19 µs      │ 53.33 µs      │ 1000000 │ 1000000
+         ├─ large_medium (msg_len=33.3k)  24.99 µs      │ 103.6 µs      │ 25.29 µs      │ 25.36 µs      │ 1000000 │ 1000000
+         ├─ medium (msg_len=22.5k)        17.09 µs      │ 61.79 µs      │ 17.29 µs      │ 17.3 µs       │ 1000000 │ 1000000
+         ├─ medium_small (msg_len=11.1k)  8.599 µs      │ 39.89 µs      │ 8.799 µs      │ 8.811 µs      │ 1000000 │ 1000000
+         ├─ small (msg_len=5.5k)          4.999 µs      │ 253.7 µs      │ 5.149 µs      │ 5.147 µs      │ 1000000 │ 2000000
+         ╰─ small_min (msg_len=40b)       987.2 ns      │ 3.518 µs      │ 1.005 µs      │ 1.006 µs      │ 1000000 │ 16000000

@@ -21,15 +21,15 @@ Times are the average 1,000,000 samples, lower is better.
 
 | Approach     | Safety | Child |    70.5k     |    33.3k     |    22.5k     |    11.1k     |     5.5k     |     40b      | Decoding Throughput¹ |
 |--------------|:------:|:-----:|:------------:|:------------:|:------------:|:------------:|:------------:|:------------:|:--------------------:|
-| **BaseLine** |   ✅    |  Box  |   348.8 µs   |   164.2 µs   |   105.4 µs   |   45.65 µs   |   30.92 µs   |   737.3 ns   |      202.5 MB/s      |
-| **Nested**   |   ✅    |  Box  |   300.9 µs   |   135.6 µs   |   78.48 µs   |   26.37 µs   |   17.38 µs   |   692.1 ns   |      233.3 MB/s      |
-| **Nested**   |   ❌    |  Box  |   176.2 µs   |   65.55 µs   |   27.41 µs   |   13.73 µs   |   8.424 µs   |   651.4 ns   |      401.6 MB/s      |
-| **Flat**     |   ✅    | Index |   307.1 µs   |   137.8 µs   |   80.44 µs   |   27.28 µs   |   18.40 µs   |   274.8 ns   |      232.9 MB/s      |
-| **Flat**     |   ❓    | Const |   177.7 µs   |   63.67 µs   |   27.52 µs   |   13.60 µs   |   8.085 µs   |   252.6 ns   |      397.3 MB/s      |
-| **Flat**     |   ❌    | Const |   174.3 µs   |   61.80 µs   |   26.66 µs   |   13.14 µs   |   7.806 µs   | **246.0 ns** |      404.4 MB/s      |
-| **Table**    |   ✅    | Index |   60.51 µs   |   29.22 µs   |   19.78 µs   |   10.72 µs   |   6.663 µs   |   2.055 µs   |      1.206 GB/s      |
-| **Table**    |   ❓    | Const |   59.70 µs   |   28.48 µs   |   19.12 µs   |   9.941 µs   |   5.722 µs   |   1.105 µs   |      1.206 GB/s      |
-| **Table**    |   ❌    | Const | **53.54 µs** | **25.43 µs** | **17.45 µs** | **8.925 µs** | **5.259 µs** |   1.069 µs   |      1.347 GB/s      |
+| **BaseLine** |   ✅    |  Box  |   352.7 µs   |   162.0 µs   |   106.0 µs   |   44.20 µs   |   30.58 µs   |   695.9 ns   |      201.8 MB/s      |
+| **Nested**   |   ✅    |  Box  |   297.7 µs   |   134.2 µs   |   77.66 µs   |   26.02 µs   |   17.36 µs   |   648.0 ns   |      236.6 MB/s      |
+| **Nested**   |   ❌    |  Box  |   176.0 µs   |   65.33 µs   |   27.11 µs   |   13.67 µs   |   8.387 µs   |   614.1 ns   |      402.0 MB/s      |
+| **Flat**     |   ✅    | Index |   299.0 µs   |   135.4 µs   |   76.95 µs   |   26.45 µs   |   17.11 µs   |   236.7 ns   |      235.7 MB/s      |
+| **Flat**     |   ❓    | Const |   181.3 µs   |   67.62 µs   |   29.57 µs   |   14.55 µs   |   8.435 µs   |   228.9 ns   |      389.4 MB/s      |
+| **Flat**     |   ❌    | Const |   177.8 µs   |   61.35 µs   |   26.53 µs   |   13.14 µs   |   7.834 µs   | **223.2 ns** |      400.2 MB/s      |
+| **Table**    |   ✅    | Index |   56.99 µs   |   27.53 µs   |   18.64 µs   |   9.995 µs   |   6.364 µs   |   1.921 µs   |      1.277 GB/s      |
+| **Table**    |   ❓    | Const |   56.97 µs   |   27.20 µs   |   18.10 µs   |   9.386 µs   |   5.638 µs   |   1.024 µs   |      1.263 GB/s      |
+| **Table**    |   ❌    | Const | **53.33 µs** | **25.36 µs** | **17.30 µs** | **8.811 µs** | **5.147 µs** |   1.006 µs   |      1.351 GB/s      |
 
 ✅ Entirely safe code; no unsafe operations anywhere.  
 ❓ Uses only const pointer dereferences as the sole unsafe operation, otherwise safe.  
@@ -50,7 +50,7 @@ require specific encoding or embeddings are also not useful.
 
 ### Baseline:
 
-This implementation uses a fully safe, direct traversal of a nested `TreeNode`
+This implementation uses a fully safe, direct traversal of a nested tree
 structure to decode the Huffman-encoded message. It initializes a `BitVec` from
 the encoded message bytes and iterates through the bitstream one bit at a time.
 It branches at each bit to the `left_child` or `right_child` of the current
@@ -59,12 +59,12 @@ and appended to the decoded message `String`.
 
 #### Key Points:
 
-- **Safe code:** Uses `Option<Box<TreeNode>>` for child references.
+- **Safe code:** Uses `Option<Box<Node>>` for child references.
 - **Minimal preparation cost:** Only requires building the Huffman tree.
 - **Simple and direct:** Provides a clean and readable implementation but lacks
   performance optimizations.
 
-### TreeNode:
+### Nested:
 
 This implementation builds on the `Baseline` approach but uses an optimized
 loop to process each encoded byte more efficiently. The decoder reads one byte
@@ -90,16 +90,16 @@ decoded message is written to a pre-allocated Vec<u8>.
   decoded message while the unsafe version assigns symbols via a ptr and offset.
 
 
-### FlatNode:
+### Flat:
 
-This approach builds on the TreeNode approach but uses a flat representation of
+This approach builds on the nested approach but uses a flat representation of
 the tree instead of a nested representation. Using this flat layout allows
 either indices or pointers to be used for child node linking.
 
-An observation of the TreeNode approach for small messages is that building the
+An observation of the nested approach for small messages is that building the
 heap (tree) is ~85% of the total processing time. Using a flat representation
-allows for a simpler Node and reduces the heap (tree) building time by 75% so
-that it accounts for less than 50% of the time on the small messages.
+allows for a simpler Node and reduces the heap (tree) building time by 75% and
+dramatically improves the time on small messages.
 
 #### Key Improvements:
 
@@ -116,17 +116,17 @@ that it accounts for less than 50% of the time on the small messages.
 This approach uses a multi-symbol lookup table built upfront by decoding all
 8-bit paths through the tree.
 
-An observation from analysis of the FlatNode approach is that the upfront cost
+An observation from analysis of the flat approach is that the upfront cost
 of any prep work for faster decoding has to be amortized quickly when dealing
 with only 75k or less encoded bytes. After several failed experiments with a
 variety of table based, recursive trees, multi-symbol processing methods,
 SIMD, parallel, finite state machines and others I was ready to say it was just
 too small to amortize the setup costs.
 
-Using the FlatNode decoder to decode integers `0..=255` and storing the symbols
-traversed for each along with the symbol count and number of bits used each in
-their own flat array provides excellent data characteristics for the compiler
-and the cpu.
+Using the flat decoder to decode integers `0..=255` and storing the symbols
+traversed and number of bits used in their own flat array creates a multi-symbol
+lookup table that provides excellent data characteristics for the compiler and
+the cpu.
 
 #### Key Improvements:
 
@@ -134,8 +134,9 @@ and the cpu.
   [blazing fast bit reading](https://github.com/nickbabcock/bitter#comparison-to-other-libraries).
 - **Multi-symbol:** flat lookup table for each 8 step path from `0..=255`
   generated using the tree provided by `FlatNode`.
-- **Manual loop unrolling:** for both bulk ('outer') and per symbol ('inner')
-  loops.
+- **Loop unrolling:** manually for both bulk ('outer') and compiler unrolled for
+  the per symbol ('inner') loops. With the inner's compiled code exactly
+  matching a manually unrolled and optimized loop.
 
 #### Safety:
 

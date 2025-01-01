@@ -1,0 +1,9 @@
+[package]
+name = "baseline"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+bit-vec = "0.8.0"
+common = { workspace = true }
+divan = { workspace = true }
