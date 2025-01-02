@@ -4,13 +4,12 @@ use common::packet::Packet;
 
 pub fn decode_packet(content: &[u8]) -> String {
     let packet = &Packet::new(content);
-    let tree = &tree(packet);
+    let tree = &huffman_tree(packet);
     decode_message(packet, tree)
 }
 
 fn decode_message(packet: &Packet, tree: &HeapNode) -> String {
-    let decoded_len = packet.decoded_bytes_len;
-    let mut decoded = String::with_capacity(decoded_len as usize);
+    let mut decoded = String::with_capacity(packet.decoded_bytes_len as usize);
     let mut current = tree;
 
     let mut bits = BitVec::from_bytes(packet.encoded_message);
@@ -37,7 +36,7 @@ fn decode_message(packet: &Packet, tree: &HeapNode) -> String {
     decoded
 }
 
-fn tree(packet: &Packet) -> HeapNode {
+fn huffman_tree(packet: &Packet) -> HeapNode {
     let mut heap = symbols_heap(packet);
     let mut size = heap.len();
 
@@ -52,7 +51,7 @@ fn tree(packet: &Packet) -> HeapNode {
 
 fn symbols_heap(packet: &Packet) -> MinHeap<HeapNode> {
     let mut heap = MinHeap::<HeapNode>::new();
-    let bytes = &packet.symbol_table_bytes;
+    let bytes = &packet.symbol_frequency_bytes;
     for i in 0..packet.symbol_count {
         let pos = (i as usize) * 8;
         let frequency = u32::from_le_bytes(bytes[pos..pos + 4].try_into().unwrap());
@@ -134,7 +133,7 @@ mod bench {
     fn decode_message(bencher: Bencher, case: &Case) {
         let response_bytes = case.request();
         let packet = &Packet::new(&response_bytes);
-        let tree = tree(packet);
+        let tree = huffman_tree(packet);
         bencher
             .counter(BytesCount::from(packet.decoded_bytes_len))
             .bench_local(move || black_box(super::decode_message(black_box(&packet), &tree)));

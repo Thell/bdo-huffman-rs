@@ -3,35 +3,34 @@ use common::packet::Packet;
 
 pub fn decode_packet(content: &[u8]) -> String {
     let packet = &Packet::new(content);
-    let tree = tree(packet);
-    decode_message(packet, &tree)
+    let tree = &huffman_tree(packet);
+    decode_message(packet, tree)
 }
 
 fn decode_message(packet: &Packet, tree: &HeapNode) -> String {
     let mut decoded: Vec<u8> = vec![0; packet.decoded_bytes_len as usize];
-    let mut current = tree;
     let mut write_index = 0;
+    let mut current = tree;
 
     'outer: for byte in packet.encoded_message.iter() {
         let mut bits = *byte;
+
         for _ in 0..8 {
-            let bit = (bits & 0b1000_0000) != 0;
+            let direction = (bits & 0b1000_0000) != 0;
             bits <<= 1;
 
-            let child = match bit {
+            current = match direction {
                 true => current.right_child.as_ref().unwrap(),
                 false => current.left_child.as_ref().unwrap(),
             };
-            current = child;
 
             if let Some(symbol) = current.symbol {
                 decoded[write_index] = symbol;
                 write_index += 1;
-                current = tree;
-
                 if write_index == packet.decoded_bytes_len as usize {
                     break 'outer;
                 }
+                current = tree;
             }
         }
     }
@@ -40,22 +39,26 @@ fn decode_message(packet: &Packet, tree: &HeapNode) -> String {
     std::str::from_utf8(slice).unwrap().to_owned()
 }
 
-fn tree(packet: &Packet) -> HeapNode {
+fn huffman_tree(packet: &Packet) -> HeapNode {
     let mut heap = symbols_heap(packet);
     let mut size = heap.len();
 
+    // Successively move two smallest nodes from heap to tree
     while size > 1 {
         let left = heap.pop();
         let right = heap.pop();
+
+        // Add a parent node to the heap for ordering
         heap.push(HeapNode::new_parent(left, right));
         size -= 1;
     }
+    // Return the last node (the root) as the tree
     heap.pop()
 }
 
 fn symbols_heap(packet: &Packet) -> MinHeap<HeapNode> {
     let mut heap = MinHeap::<HeapNode>::new();
-    let bytes = &packet.symbol_table_bytes;
+    let bytes = &packet.symbol_frequency_bytes;
     for i in 0..packet.symbol_count {
         let pos = (i as usize) * 8;
         let frequency = u32::from_le_bytes(bytes[pos..pos + 4].try_into().unwrap());
@@ -137,7 +140,7 @@ mod bench {
     fn decode_message(bencher: Bencher, case: &Case) {
         let response_bytes = case.request();
         let packet = &Packet::new(&response_bytes);
-        let tree = tree(packet);
+        let tree = huffman_tree(packet);
         bencher
             .counter(BytesCount::from(packet.decoded_bytes_len))
             .bench_local(move || {

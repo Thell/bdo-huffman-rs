@@ -3,7 +3,7 @@ pub const MAX_SYMBOLS: usize = 12; // digits 0-9, '|' and '-'
 pub struct Packet<'a> {
     pub len: u64,
     pub symbol_count: u32,
-    pub symbol_table_bytes: &'a [u8],
+    pub symbol_frequency_bytes: &'a [u8],
     pub bitstream_len: u32,
     pub encoded_bytes_len: u32,
     pub decoded_bytes_len: u32,
@@ -25,7 +25,7 @@ impl<'a> Packet<'a> {
         let symbol_count = u32::from_le_bytes(u32_bytes);
         pos += 4;
 
-        let symbol_table_bytes = &content[pos..pos + 8 * symbol_count as usize];
+        let symbol_frequency_bytes = &content[pos..pos + 8 * symbol_count as usize];
         pos += 8 * symbol_count as usize;
 
         u32_bytes = content[pos..pos + 4].try_into().unwrap();
@@ -45,7 +45,7 @@ impl<'a> Packet<'a> {
         Packet {
             len,
             symbol_count,
-            symbol_table_bytes,
+            symbol_frequency_bytes,
             bitstream_len,
             encoded_bytes_len,
             decoded_bytes_len,
@@ -69,7 +69,7 @@ mod tests {
         let mut pos = 0;
         let mut frequencies = Vec::with_capacity(MAX_SYMBOLS);
 
-        let bytes = &packet.symbol_table_bytes;
+        let bytes = &packet.symbol_frequency_bytes;
         for _ in 0..packet.symbol_count {
             let freq_bytes: [u8; 4] = bytes[pos..pos + 4].try_into().unwrap();
             let frequency = u32::from_le_bytes(freq_bytes);

@@ -5,9 +5,9 @@ use bitter::{BigEndianReader, BitReader};
 
 pub fn decode_packet(content: &[u8]) -> String {
     let packet = &Packet::new(content);
-    let tree = &tree(packet);
-    let table = &table(tree);
-    decode_message(packet, &table)
+    let tree = &huffman_tree(packet);
+    let table = &symbols_table(tree);
+    decode_message(packet, table)
 }
 
 fn decode_message(packet: &Packet, table: &SymbolTable) -> String {
@@ -15,80 +15,79 @@ fn decode_message(packet: &Packet, table: &SymbolTable) -> String {
     let mut decoded: Vec<u8> = vec![0; packet.decoded_bytes_len as usize + 8];
     let mut write_index = 0usize;
 
-    let mut bits = BigEndianReader::new(packet.encoded_message);
+    let mut bit_reader = BigEndianReader::new(packet.encoded_message);
 
     // Lookahead is 56bits
     // Consume unbuffered bytes by processing 7 8-bit indices per iteration.
     // This does not consume all bits in lookahead on each iteration.
-    while bits.unbuffered_bytes_remaining() > 7 {
-        bits.refill_lookahead();
-        lookup_unchecked_prefix_table_safe(&mut bits, table, &mut write_index, &mut decoded);
-        lookup_unchecked_prefix_table_safe(&mut bits, table, &mut write_index, &mut decoded);
-        lookup_unchecked_prefix_table_safe(&mut bits, table, &mut write_index, &mut decoded);
-        lookup_unchecked_prefix_table_safe(&mut bits, table, &mut write_index, &mut decoded);
-        lookup_unchecked_prefix_table_safe(&mut bits, table, &mut write_index, &mut decoded);
-        lookup_unchecked_prefix_table_safe(&mut bits, table, &mut write_index, &mut decoded);
-        lookup_unchecked_prefix_table_safe(&mut bits, table, &mut write_index, &mut decoded);
+    while bit_reader.unbuffered_bytes_remaining() > 7 {
+        bit_reader.refill_lookahead();
+        lookup_byte(&mut bit_reader, table, &mut write_index, &mut decoded);
+        lookup_byte(&mut bit_reader, table, &mut write_index, &mut decoded);
+        lookup_byte(&mut bit_reader, table, &mut write_index, &mut decoded);
+        lookup_byte(&mut bit_reader, table, &mut write_index, &mut decoded);
+        lookup_byte(&mut bit_reader, table, &mut write_index, &mut decoded);
+        lookup_byte(&mut bit_reader, table, &mut write_index, &mut decoded);
+        lookup_byte(&mut bit_reader, table, &mut write_index, &mut decoded);
     }
 
     // Drain unbuffered bytes with safe refill.
-    while bits.unbuffered_bytes_remaining() > 0 {
-        bits.refill_lookahead();
-        lookup_unchecked_prefix_table_safe(&mut bits, table, &mut write_index, &mut decoded);
+    while bit_reader.unbuffered_bytes_remaining() > 0 {
+        bit_reader.refill_lookahead();
+        lookup_byte(&mut bit_reader, table, &mut write_index, &mut decoded);
     }
 
     // Consume lookahead without refill or peek checks until the last byte.
-    while bits.has_bits_remaining(8) {
-        lookup_unchecked_prefix_table_safe(&mut bits, table, &mut write_index, &mut decoded);
+    while bit_reader.has_bits_remaining(8) {
+        lookup_byte(&mut bit_reader, table, &mut write_index, &mut decoded);
     }
 
-    // Drain partial byte bits with peek checks.
-    while bits.has_bits_remaining(1) && write_index < packet.decoded_bytes_len as usize {
-        lookup_prefix_table_safe(&mut bits, table, &mut write_index, &mut decoded);
+    // Drain partial byte remaining bits with peek checks.
+    while bit_reader.has_bits_remaining(1) && write_index < packet.decoded_bytes_len as usize {
+        lookup_bits(&mut bit_reader, table, &mut write_index, &mut decoded);
     }
 
-    // Truncate decoded slop space.
+    // Truncate decoded slop.
     let slice = &decoded[..];
     let mut decoded = std::str::from_utf8(slice).unwrap().to_owned();
     decoded.truncate(packet.decoded_bytes_len as usize);
     decoded
 }
 
-fn lookup_unchecked_prefix_table_safe(
-    bits: &mut BigEndianReader,
+fn lookup_byte(
+    bit_reader: &mut BigEndianReader,
     table: &SymbolTable,
     write_index: &mut usize,
     decoded: &mut [u8],
 ) {
-    let index = bits.peek(8) as usize;
-
+    let index = bit_reader.peek(8) as usize;
     let symbols = &table.symbols[index];
     let used_bits = table.bits_used[index];
 
-    get_symbols_unchecked_safe(symbols, write_index, decoded);
-    bits.consume(used_bits as u32);
+    copy_symbols(symbols, write_index, decoded);
+    bit_reader.consume(used_bits as u32);
 }
 
-fn lookup_prefix_table_safe(
-    bits: &mut BigEndianReader,
+fn lookup_bits(
+    bit_reader: &mut BigEndianReader,
     table: &SymbolTable,
     write_index: &mut usize,
     decoded: &mut [u8],
 ) {
-    let lookahead_count = bits.lookahead_bits().min(8);
-    let last_bits = bits.peek(lookahead_count);
+    let lookahead_count = bit_reader.lookahead_bits().min(8);
+    let last_bits = bit_reader.peek(lookahead_count);
     let index = (last_bits << (8 - lookahead_count)) as usize;
 
     let symbols = &table.symbols[index];
     let used_bits = table.bits_used[index];
 
-    get_symbols_unchecked_safe(symbols, write_index, decoded);
+    copy_symbols(symbols, write_index, decoded);
 
     let bits_to_consume = lookahead_count.min(used_bits as u32);
-    bits.consume(bits_to_consume);
+    bit_reader.consume(bits_to_consume);
 }
 
-fn get_symbols_unchecked_safe(symbols: &[u8], write_index: &mut usize, decoded: &mut [u8]) {
+fn copy_symbols(symbols: &[u8], write_index: &mut usize, decoded: &mut [u8]) {
     decoded[*write_index] = symbols[0];
     *write_index += 1;
     for i in 1..6 {
@@ -101,20 +100,20 @@ fn get_symbols_unchecked_safe(symbols: &[u8], write_index: &mut usize, decoded: 
     }
 }
 
-fn tree(packet: &Packet) -> Vec<TreeNode> {
+fn huffman_tree(packet: &Packet) -> Vec<TreeNode> {
     let mut heap = symbols_heap(packet);
 
     let mut right_index = 2 * packet.symbol_count as usize - 1;
     let mut tree = vec![TreeNode::default(); right_index];
     right_index -= 1;
 
+    // Successively move two smallest nodes from heap to tree
     loop {
-        // Move two smallest nodes from heap to vec ensuring smallest on the left
         let left = heap.pop();
         let right = heap.pop();
         let parent_frequency = left.frequency + right.frequency;
 
-        // Add popped nodes to the tree vec by setting the existing node values
+        // Add popped nodes to the tree by setting the existing node values
         tree[right_index - 1].symbol = left.symbol;
         tree[right_index].symbol = right.symbol;
         tree[right_index - 1].left_ptr = &tree[left.left_index as usize] as *const TreeNode;
@@ -144,7 +143,7 @@ fn tree(packet: &Packet) -> Vec<TreeNode> {
 
 fn symbols_heap(packet: &Packet) -> MinHeap<HeapNode> {
     let mut heap = MinHeap::<HeapNode>::new();
-    let bytes = &packet.symbol_table_bytes;
+    let bytes = &packet.symbol_frequency_bytes;
     for i in 0..packet.symbol_count {
         let pos = (i as usize) * 8;
         let frequency = u32::from_le_bytes(bytes[pos..pos + 4].try_into().unwrap());
@@ -170,7 +169,7 @@ impl Default for SymbolTable {
 }
 
 #[inline(always)]
-fn table(tree: &[TreeNode]) -> SymbolTable {
+fn symbols_table(tree: &[TreeNode]) -> SymbolTable {
     // Generate a multi-symbol lookup table.
     // Decodes all 8 step paths through the tree storing each symbol visited,
     // the number of symbols written, and the number of bits used when the
@@ -241,18 +240,18 @@ impl PartialOrd for HeapNode {
 impl HeapNode {
     fn new(symbol: Option<u8>, frequency: u32) -> Self {
         Self {
-            symbol,
-            frequency,
             left_index: 0,
             right_index: 0,
+            symbol,
+            frequency,
         }
     }
     fn new_parent(frequency: u32, left_index: u8, right_index: u8) -> Self {
         Self {
-            symbol: None,
-            frequency,
             left_index,
             right_index,
+            symbol: None,
+            frequency,
         }
     }
 }
@@ -303,8 +302,8 @@ mod bench {
     fn decode_message(bencher: Bencher, case: &Case) {
         let response_bytes = case.request();
         let packet = &Packet::new(&response_bytes);
-        let tree = &tree(packet);
-        let table = table(tree);
+        let tree = &huffman_tree(packet);
+        let table = symbols_table(tree);
         bencher
             .counter(BytesCount::from(packet.decoded_bytes_len))
             .bench_local(move || {

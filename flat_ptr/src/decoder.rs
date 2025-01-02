@@ -3,8 +3,8 @@ use common::packet::Packet;
 
 pub fn decode_packet(content: &[u8]) -> String {
     let packet = &Packet::new(content);
-    let tree = tree(packet);
-    decode_message(packet, &tree)
+    let tree = &huffman_tree(packet);
+    decode_message(packet, tree)
 }
 
 #[allow(clippy::unnecessary_cast)]
@@ -41,20 +41,20 @@ fn decode_message(packet: &Packet, tree: &[TreeNode]) -> String {
     std::str::from_utf8(slice).unwrap().to_owned()
 }
 
-fn tree(packet: &Packet) -> Vec<TreeNode> {
+fn huffman_tree(packet: &Packet) -> Vec<TreeNode> {
     let mut heap = symbols_heap(packet);
 
     let mut right_index = 2 * packet.symbol_count as usize - 1;
     let mut tree = vec![TreeNode::default(); right_index];
     right_index -= 1;
 
+    // Successively move two smallest nodes from heap to tree
     loop {
-        // Move two smallest nodes from heap to vec ensuring smallest on the left
         let left = heap.pop();
         let right = heap.pop();
         let parent_frequency = left.frequency + right.frequency;
 
-        // Add popped nodes to the tree vec by setting the existing node values
+        // Add popped nodes to the tree by setting the existing node values
         tree[right_index - 1].symbol = left.symbol;
         tree[right_index].symbol = right.symbol;
         tree[right_index - 1].left_ptr = &tree[left.left_index as usize] as *const TreeNode;
@@ -71,7 +71,7 @@ fn tree(packet: &Packet) -> Vec<TreeNode> {
 
         right_index -= 2;
         if right_index < 2 {
-            // Move the last node (the root) to the tree vec
+            // Move the last node (the root) to the tree
             let root = heap.pop();
             tree[0].symbol = root.symbol;
             tree[0].left_ptr = &tree[root.left_index as usize] as *const TreeNode;
@@ -84,7 +84,7 @@ fn tree(packet: &Packet) -> Vec<TreeNode> {
 
 fn symbols_heap(packet: &Packet) -> MinHeap<HeapNode> {
     let mut heap = MinHeap::<HeapNode>::new();
-    let bytes = &packet.symbol_table_bytes;
+    let bytes = &packet.symbol_frequency_bytes;
     for i in 0..packet.symbol_count {
         let pos = (i as usize) * 8;
         let frequency = u32::from_le_bytes(bytes[pos..pos + 4].try_into().unwrap());
@@ -122,18 +122,18 @@ impl PartialOrd for HeapNode {
 impl HeapNode {
     fn new(symbol: Option<u8>, frequency: u32) -> Self {
         Self {
-            symbol,
-            frequency,
             left_index: 0,
             right_index: 0,
+            symbol,
+            frequency,
         }
     }
     fn new_parent(frequency: u32, left_index: u8, right_index: u8) -> Self {
         Self {
-            symbol: None,
-            frequency,
             left_index,
             right_index,
+            symbol: None,
+            frequency,
         }
     }
 }
@@ -184,7 +184,7 @@ mod bench {
     fn decode_message(bencher: Bencher, case: &Case) {
         let response_bytes = case.request();
         let packet = &Packet::new(&response_bytes);
-        let tree = tree(packet);
+        let tree = huffman_tree(packet);
         bencher
             .counter(BytesCount::from(packet.decoded_bytes_len))
             .bench_local(move || {

@@ -3,79 +3,74 @@ use common::packet::Packet;
 
 pub fn decode_packet(content: &[u8]) -> String {
     let packet = &Packet::new(content);
-    let tree = tree(packet);
-    decode_message(packet, &tree)
+    let tree = &huffman_tree(packet);
+    unsafe { decode_message(packet, tree) }
 }
 
-fn decode_message(packet: &Packet, tree: &HeapNode) -> String {
+unsafe fn decode_message(packet: &Packet, tree: &HeapNode) -> String {
     let mut decoded: Vec<u8> = Vec::with_capacity(packet.decoded_bytes_len as usize);
+    let mut write_index = 0;
     let mut current = tree;
     let mut read_index = 0;
-    let mut write_index = 0;
 
     'outer: loop {
-        let mut bits = unsafe { *packet.encoded_message.get_unchecked(read_index) };
+        let mut bits = *packet.encoded_message.get_unchecked(read_index);
         read_index += 1;
 
         for _ in 0..8 {
             let bit = (bits & 0b1000_0000) != 0;
             bits <<= 1;
 
-            current = unsafe {
-                (*(&current.left_child as *const _ as *const *const HeapNode)
-                    .add(bit as usize)
-                    .as_ref()
-                    .unwrap_unchecked())
+            current = (*(&current.left_child as *const _ as *const *const HeapNode)
+                .add(bit as usize)
                 .as_ref()
-                .unwrap_unchecked()
-            };
+                .unwrap_unchecked())
+            .as_ref()
+            .unwrap_unchecked();
 
             if let Some(symbol) = current.symbol {
-                unsafe {
-                    *decoded.as_mut_ptr().add(write_index) = symbol;
-                }
+                *decoded.as_mut_ptr().add(write_index) = symbol;
                 write_index += 1;
-                current = tree;
-
                 if write_index == packet.decoded_bytes_len as usize {
                     break 'outer;
                 }
+                current = tree;
             }
         }
     }
 
-    unsafe {
-        decoded.set_len(write_index);
-        let slice = std::slice::from_raw_parts(decoded.as_ptr(), decoded.len());
-        std::str::from_utf8_unchecked(slice).to_owned()
-    }
+    decoded.set_len(write_index);
+    let slice = std::slice::from_raw_parts(decoded.as_ptr(), decoded.len());
+    std::str::from_utf8_unchecked(slice).to_owned()
 }
 
-fn tree(packet: &Packet) -> HeapNode {
-    let mut heap = symbols_heap(packet);
+fn huffman_tree(packet: &Packet) -> HeapNode {
+    let mut heap = unsafe { symbols_heap(packet) };
     let mut size = heap.len();
 
+    // Successively move two smallest nodes from heap to tree
     while size > 1 {
         let left = heap.pop();
         let right = heap.pop();
+
+        // Add a parent node to the heap for ordering
         heap.push(HeapNode::new_parent(left, right));
         size -= 1;
     }
+    // Return the last node (the root) as the tree
     heap.pop()
 }
 
-fn symbols_heap(packet: &Packet) -> MinHeap<HeapNode> {
+unsafe fn symbols_heap(packet: &Packet) -> MinHeap<HeapNode> {
     let mut heap = MinHeap::<HeapNode>::new();
-    let ptr = packet.symbol_table_bytes.as_ptr();
-    unsafe {
-        for i in 0..packet.symbol_count {
-            let freq_ptr = ptr.add(i as usize * 8) as *const u32;
-            let symbol_ptr = ptr.add(i as usize * 8 + 4);
+    let ptr = packet.symbol_frequency_bytes.as_ptr();
+    for i in 0..packet.symbol_count {
+        let freq_ptr = ptr.add(i as usize * 8) as *const u32;
+        let symbol_ptr = ptr.add(i as usize * 8 + 4);
 
-            let frequency = freq_ptr.read_unaligned();
-            let symbol = symbol_ptr.read();
-            heap.push(HeapNode::new(Some(symbol), frequency));
-        }
+        let frequency = freq_ptr.read_unaligned();
+        let symbol = symbol_ptr.read();
+        heap.push(HeapNode::new(Some(symbol), frequency));
     }
     heap
 }
@@ -152,11 +147,11 @@ mod bench {
     fn decode_message(bencher: Bencher, case: &Case) {
         let response_bytes = case.request();
         let packet = &Packet::new(&response_bytes);
-        let tree = tree(packet);
+        let tree = huffman_tree(packet);
         bencher
             .counter(BytesCount::from(packet.decoded_bytes_len))
             .bench_local(move || {
-                super::decode_message(black_box(&packet), &tree);
+                unsafe { super::decode_message(black_box(&packet), &tree) };
             });
     }
 
