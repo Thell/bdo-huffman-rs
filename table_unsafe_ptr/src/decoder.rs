@@ -18,8 +18,8 @@ fn decode_message(packet: &Packet, table: &SymbolTable) -> String {
     let mut bit_reader = BigEndianReader::new(packet.encoded_message);
 
     // Lookahead is 56bits
-    // Consume unbuffered bytes by processing 7 8-bit indices per iteration.
-    // This does not consume all bits in lookahead on each iteration.
+    // Consume unbuffered bytes; guaranteed 7 8-bit indices per iteration.
+    // Since each lookup is not guaranteed to consume all bits try processing more.
     while bit_reader.unbuffered_bytes_remaining() > 7 {
         unsafe {
             bit_reader.refill_lookahead_unchecked();
@@ -30,6 +30,11 @@ fn decode_message(packet: &Packet, table: &SymbolTable) -> String {
             lookup_byte_unchecked(&mut bit_reader, table, &mut write_index, &mut decoded);
             lookup_byte_unchecked(&mut bit_reader, table, &mut write_index, &mut decoded);
             lookup_byte_unchecked(&mut bit_reader, table, &mut write_index, &mut decoded);
+            // Since the checked `refill_lookahead` is more expensive than the lookup
+            // this improves performance on medium_small+ sized msgs.
+            while bit_reader.lookahead_bits() >= 8 {
+                lookup_byte_unchecked(&mut bit_reader, table, &mut write_index, &mut decoded);
+            }
         }
     }
 
