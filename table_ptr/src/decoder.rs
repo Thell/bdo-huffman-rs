@@ -144,16 +144,12 @@ fn tree(packet: &Packet) -> Vec<TreeNode> {
 
 fn symbols_heap(packet: &Packet) -> MinHeap<HeapNode> {
     let mut heap = MinHeap::<HeapNode>::new();
-    let ptr = packet.symbol_table_bytes.as_ptr();
-    unsafe {
-        for i in 0..packet.symbol_count {
-            let freq_ptr = ptr.add(i as usize * 8) as *const u32;
-            let symbol_ptr = ptr.add(i as usize * 8 + 4);
-
-            let frequency = freq_ptr.read_unaligned();
-            let symbol = symbol_ptr.read();
-            heap.push(HeapNode::new(Some(symbol), frequency));
-        }
+    let bytes = &packet.symbol_table_bytes;
+    for i in 0..packet.symbol_count {
+        let pos = (i as usize) * 8;
+        let frequency = u32::from_le_bytes(bytes[pos..pos + 4].try_into().unwrap());
+        let symbol = bytes[pos + 4];
+        heap.push(HeapNode::new(Some(symbol), frequency));
     }
     heap
 }
