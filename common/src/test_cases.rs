@@ -82,7 +82,7 @@ pub const EXPECTED_PREFIXES: [(&str, &str); 12] = [
 
 #[rustfmt::skip]
 #[allow(unused)]
-pub const EXPECTED_SYMBOL_TABLE: [(u8, u32); 12] = [
+pub const EXPECTED_SYMBOL_FREQUENCIES: [(u8, u32); 12] = [
     (45, 6), (48, 11), (49, 3), (50, 1), (51, 2), (52, 1),
     (53, 6), (54, 2), (55, 2), (56, 3), (57, 1), (124, 2),
 ];

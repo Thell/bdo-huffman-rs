@@ -122,7 +122,7 @@ mod tests {
     fn pop_order() {
         // Tests the integrity of the MinHeap min element ordering.
         let mut heap = MinHeap::<HeapNode>::new();
-        for (symbol, frequency) in EXPECTED_SYMBOL_TABLE {
+        for (symbol, frequency) in EXPECTED_SYMBOL_FREQUENCIES {
             heap.push(HeapNode::new(Some(symbol), frequency));
         }
         let mut pop_order = Vec::<Option<u8>>::new();

@@ -52,24 +52,6 @@ impl<'a> Packet<'a> {
             encoded_message,
         }
     }
-
-    pub fn symbols_table(&self) -> Vec<(u8, u32)> {
-        let mut frequencies = [(0u8, 0u32); 12];
-        let ptr = self.symbol_table_bytes.as_ptr();
-        unsafe {
-            for i in 0..self.symbol_count {
-                let freq_ptr = ptr.add(i as usize * 8) as *const u32;
-                let symbol_ptr = ptr.add(i as usize * 8 + 4);
-
-                let frequency = freq_ptr.read_unaligned();
-                let symbol = symbol_ptr.read();
-
-                *frequencies.get_unchecked_mut(i as usize) = (symbol, frequency);
-            }
-        }
-
-        frequencies[..self.symbol_count as usize].to_vec()
-    }
 }
 
 // =========================================================
@@ -82,9 +64,21 @@ mod tests {
     use crate::test_cases::*;
 
     #[test]
-    fn parses_symbol_table() {
+    fn parses_symbol_frequencies() {
         let packet = &Packet::new(&TEST_BYTES);
-        assert!(packet.symbols_table() == EXPECTED_SYMBOL_TABLE);
+        let mut pos = 0;
+        let mut frequencies = Vec::with_capacity(MAX_SYMBOLS);
+
+        let bytes = &packet.symbol_table_bytes;
+        for _ in 0..packet.symbol_count {
+            let freq_bytes: [u8; 4] = bytes[pos..pos + 4].try_into().unwrap();
+            let frequency = u32::from_le_bytes(freq_bytes);
+            let symbol = bytes[pos + 4];
+            frequencies.push((symbol, frequency));
+            pos += 8;
+        }
+
+        assert!(frequencies == EXPECTED_SYMBOL_FREQUENCIES);
     }
 }
 
@@ -102,16 +96,6 @@ mod benches {
 
         bencher.bench_local(move || {
             black_box(Packet::new(response_bytes));
-        });
-    }
-
-    #[divan::bench(args = [ALL_CASES[0], ALL_CASES[5]])]
-    fn symbols_table(bencher: Bencher, case: &Case) {
-        let response_bytes = &case.request();
-        let packet = Packet::new(response_bytes);
-
-        bencher.bench_local(move || {
-            black_box(&packet.symbols_table());
         });
     }
 }
