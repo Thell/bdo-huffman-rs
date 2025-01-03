@@ -6,4 +6,3 @@ edition = "2021"
 [dependencies]
 mimalloc = { workspace = true }
 divan = { workspace = true }
-nohash-hasher = { workspace = true }

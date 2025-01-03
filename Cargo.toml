@@ -22,7 +22,6 @@ members = [
 [workspace.dependencies]
 common = { version = "*", path = "common" }
 mimalloc = "0.1.43"
-nohash-hasher = "0.2.0"
 divan = "0.1.17"
 
 [dev-dependencies]
