@@ -7,7 +7,6 @@ pub fn decode_packet(content: &[u8]) -> String {
     decode_message(packet, tree)
 }
 
-#[allow(clippy::unnecessary_cast)]
 fn decode_message(packet: &Packet, tree: &[TreeNode]) -> String {
     let mut decoded: Vec<u8> = vec![0; packet.decoded_bytes_len as usize];
     let root = &tree[0];

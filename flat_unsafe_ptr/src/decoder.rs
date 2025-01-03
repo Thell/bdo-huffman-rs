@@ -7,7 +7,6 @@ pub fn decode_packet(content: &[u8]) -> String {
     unsafe { decode_message(packet, tree) }
 }
 
-#[allow(clippy::unnecessary_cast)]
 unsafe fn decode_message(packet: &Packet, tree: &[TreeNode]) -> String {
     let mut decoded: Vec<u8> = Vec::with_capacity(packet.decoded_bytes_len as usize);
     let mut write_index = 0;
