@@ -17,6 +17,8 @@ members = [
     "table_index",
     "table_ptr",
     "table_unsafe_ptr",
+
+    "profile_bin",
 ]
 
 [workspace.dependencies]
@@ -39,7 +41,11 @@ table_index = { version = "*", path = "table_index" }
 table_ptr = { version = "*", path = "table_ptr" }
 table_unsafe_ptr = { version = "*", path = "table_unsafe_ptr" }
 
+profile_bin = { version = "*", path = "profile_bin" }
 
 [[bench]]
 name = "benches"
 harness = false
+
+[profile.release]
+debug = true

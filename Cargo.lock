@@ -30,6 +30,7 @@ dependencies = [
  "nested_box",
  "nested_unsafe_box",
  "paste",
+ "profile_bin",
  "table_index",
  "table_ptr",
  "table_unsafe_ptr",
@@ -227,6 +228,14 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "37d3544b3f2748c54e147655edb5025752e2303145b5aefb3c3ea2c78b973bb0"
 dependencies = [
  "unicode-ident",
+]
+
+[[package]]
+name = "profile_bin"
+version = "0.1.0"
+dependencies = [
+ "common",
+ "mimalloc",
 ]
 
 [[package]]
