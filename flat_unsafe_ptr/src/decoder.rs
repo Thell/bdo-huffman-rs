@@ -65,21 +65,18 @@ fn huffman_tree(packet: &Packet) -> Vec<TreeNode> {
         tree[right_index - 1].right_ptr = &tree[left.right_index as usize] as *const TreeNode;
         tree[right_index].right_ptr = &tree[right.right_index as usize] as *const TreeNode;
 
-        // Add a parent node to the heap for ordering
-        heap.push(HeapNode::new_parent(
-            parent_frequency,
-            right_index as u8 - 1,
-            right_index as u8,
-        ));
-
-        right_index -= 2;
-        if right_index < 2 {
+        if right_index < 3 {
             // Move the last node (the root) to the tree
-            let root = heap.pop();
-            tree[0].symbol = root.symbol;
-            tree[0].left_ptr = &tree[root.left_index as usize] as *const TreeNode;
-            tree[0].right_ptr = &tree[root.right_index as usize] as *const TreeNode;
+            tree[0].symbol = None;
+            tree[0].left_ptr = &tree[1] as *const TreeNode;
+            tree[0].right_ptr = &tree[2] as *const TreeNode;
             break;
+        } else {
+            // Add a parent node to the heap for ordering
+            let parent =
+                HeapNode::new_parent(parent_frequency, right_index as u8 - 1, right_index as u8);
+            right_index -= 2;
+            heap.push(parent);
         }
     }
     tree
