@@ -1,18 +1,18 @@
 use crate::packet::MAX_SYMBOLS;
 
-pub struct MinHeap<T: MinHeapNode>(Vec<T>);
+pub struct MinHeap<T: MinHeapNode + std::cmp::PartialOrd>(Vec<T>);
 
 pub trait MinHeapNode {
     fn frequency(&self) -> u32;
 }
 
-impl<T: MinHeapNode> Default for MinHeap<T> {
+impl<T: MinHeapNode + std::cmp::PartialOrd> Default for MinHeap<T> {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<T: MinHeapNode> MinHeap<T> {
+impl<T: MinHeapNode + std::cmp::PartialOrd> MinHeap<T> {
     pub fn new() -> Self {
         MinHeap(Vec::<T>::with_capacity(MAX_SYMBOLS))
     }
@@ -27,49 +27,42 @@ impl<T: MinHeapNode> MinHeap<T> {
 
     pub fn push(&mut self, node: T) {
         self.0.push(node);
-        let mut index = self.0.len() - 1;
+        let mut child = self.0.len() - 1;
 
-        while index > 0 {
-            let parent = (index - 1) >> 1;
-            if self.0[index].frequency() >= self.0[parent].frequency() {
+        while child > 0 {
+            let parent = (child - 1) / 2;
+            // SAFETY: child is greater than 0 and parent can at minimum be zero.
+            if unsafe { self.0.get_unchecked(child) < self.0.get_unchecked(parent) } {
+                self.0.swap(child, parent);
+                child = parent;
+            } else {
                 break;
             }
-            self.0.swap(index, parent);
-            index = parent;
         }
     }
 
     pub fn pop(&mut self) -> T {
-        let mut root = self.0.pop().unwrap();
-        if self.0.is_empty() {
-            return root;
-        }
-
-        std::mem::swap(&mut self.0[0], &mut root);
-        let mut index = 0;
+        let root = self.0.swap_remove(0);
+        let mut parent = 0;
+        let mut child = 1;
         let end = self.0.len();
 
-        loop {
-            let left = 2 * index + 1;
-            if left >= end {
-                break;
-            }
-            let right = left + 1;
-
-            let smallest = if right < end && self.0[right].frequency() < self.0[left].frequency() {
-                right
-            } else {
-                left
+        while end > child {
+            // SAFETY: child is an increasing index and both children are less than end.
+            if end > child + 1
+                && unsafe { self.0.get_unchecked(child) > self.0.get_unchecked(child + 1) }
+            {
+                child += 1;
             };
 
-            if self.0[smallest].frequency() >= self.0[index].frequency() {
+            if unsafe { self.0.get_unchecked(child) < self.0.get_unchecked(parent) } {
+                self.0.swap(parent, child);
+                parent = child;
+                child = 2 * parent + 1;
+            } else {
                 break;
             }
-
-            self.0.swap(index, smallest);
-            index = smallest;
         }
-
         root
     }
 }
