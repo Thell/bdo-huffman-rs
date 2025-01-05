@@ -1,13 +1,16 @@
 use common::min_heap::*;
 use common::packet::Packet;
 
+const MAX_TREE_LEN: usize = 23;
+
 pub fn decode_packet(content: &[u8]) -> String {
     let packet = &Packet::new(content);
-    let tree = &huffman_tree(packet);
-    decode_message(packet, tree)
+    let mut tree = [TreeNode::default(); MAX_TREE_LEN];
+    huffman_tree(packet, &mut tree);
+    decode_message(packet, &tree)
 }
 
-fn decode_message(packet: &Packet, tree: &[TreeNode]) -> String {
+fn decode_message(packet: &Packet, tree: &[TreeNode; MAX_TREE_LEN]) -> String {
     let mut decoded: Vec<u8> = vec![0; packet.decoded_bytes_len as usize];
     let root = &tree[0];
     let mut node = root;
@@ -40,11 +43,10 @@ fn decode_message(packet: &Packet, tree: &[TreeNode]) -> String {
     std::str::from_utf8(slice).unwrap().to_owned()
 }
 
-fn huffman_tree(packet: &Packet) -> Vec<TreeNode> {
+fn huffman_tree(packet: &Packet, tree: &mut [TreeNode; MAX_TREE_LEN]) {
     let mut heap = symbols_heap(packet);
 
     let mut right_index = 2 * packet.symbol_count as usize - 1;
-    let mut tree = vec![TreeNode::default(); right_index];
     right_index -= 1;
 
     // Successively move two smallest nodes from heap to tree
@@ -75,11 +77,10 @@ fn huffman_tree(packet: &Packet) -> Vec<TreeNode> {
             heap.push(parent);
         }
     }
-    tree
 }
 
-fn symbols_heap(packet: &Packet) -> MinHeap<HeapNode> {
-    let mut heap = MinHeap::<HeapNode>::new();
+fn symbols_heap(packet: &Packet) -> MinHeapless<HeapNode> {
+    let mut heap = MinHeapless::<HeapNode>::new();
     let bytes = &packet.symbol_frequency_bytes;
     for i in 0..packet.symbol_count {
         let pos = (i as usize) * 8;
@@ -134,7 +135,7 @@ impl HeapNode {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Copy)]
 struct TreeNode {
     left_ptr: *const TreeNode,
     right_ptr: *const TreeNode,
@@ -180,7 +181,9 @@ mod bench {
     fn decode_message(bencher: Bencher, case: &Case) {
         let response_bytes = case.request();
         let packet = &Packet::new(&response_bytes);
-        let tree = huffman_tree(packet);
+        let mut tree = [TreeNode::default(); MAX_TREE_LEN];
+        huffman_tree(packet, &mut tree);
+
         bencher
             .counter(BytesCount::from(packet.decoded_bytes_len))
             .bench_local(move || {

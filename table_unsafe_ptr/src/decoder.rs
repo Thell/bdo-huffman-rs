@@ -3,10 +3,13 @@ use common::packet::Packet;
 
 use bitter::{BigEndianReader, BitReader};
 
+const MAX_TREE_LEN: usize = 23;
+
 pub fn decode_packet(content: &[u8]) -> String {
     let packet = &Packet::new(content);
-    let tree = &huffman_tree(packet);
-    let table = unsafe { &symbols_table_unchecked(tree) };
+    let mut tree = [TreeNode::default(); MAX_TREE_LEN];
+    huffman_tree(packet, &mut tree);
+    let table = unsafe { &symbols_table_unchecked(&tree) };
     decode_message(packet, table)
 }
 
@@ -113,12 +116,9 @@ unsafe fn copy_symbols_unchecked(symbols: &[u8], write_index: &mut usize, decode
     }
 }
 
-fn huffman_tree(packet: &Packet) -> Vec<TreeNode> {
+fn huffman_tree(packet: &Packet, tree: &mut [TreeNode; MAX_TREE_LEN]) {
     let mut heap = unsafe { symbols_heap(packet) };
-
-    let mut right_index = 2 * packet.symbol_count as usize - 1;
-    let mut tree = vec![TreeNode::default(); right_index];
-    right_index -= 1;
+    let mut right_index = 2 * packet.symbol_count as usize - 2;
 
     // Successively move two smallest nodes from heap to tree
     loop {
@@ -148,11 +148,10 @@ fn huffman_tree(packet: &Packet) -> Vec<TreeNode> {
             heap.push(parent);
         }
     }
-    tree
 }
 
-unsafe fn symbols_heap(packet: &Packet) -> MinHeap<HeapNode> {
-    let mut heap = MinHeap::<HeapNode>::new();
+unsafe fn symbols_heap(packet: &Packet) -> MinHeapless<HeapNode> {
+    let mut heap = MinHeapless::<HeapNode>::new();
     let ptr = packet.symbol_frequency_bytes.as_ptr();
     for i in 0..packet.symbol_count {
         let freq_ptr = ptr.add(i as usize * 8) as *const u32;
@@ -168,7 +167,7 @@ unsafe fn symbols_heap(packet: &Packet) -> MinHeap<HeapNode> {
 #[repr(C)]
 struct SymbolTable {
     bits_used: [u8; 256],
-    _pad: [u8; 256],
+    // _pad: [u8; 256],
     symbols: [[u8; 6]; 256],
 }
 
@@ -176,7 +175,7 @@ impl Default for SymbolTable {
     fn default() -> Self {
         SymbolTable {
             bits_used: [0u8; 256],
-            _pad: [0u8; 256],
+            // _pad: [0u8; 256],
             symbols: [[0u8; 6]; 256],
         }
     }
@@ -214,6 +213,7 @@ unsafe fn symbols_table_unchecked(tree: &[TreeNode]) -> SymbolTable {
                 write_index += 1;
                 bits_used = i + 1;
                 if write_index == 5 {
+                    // The sixth position is a sentinel `0`
                     break;
                 }
                 node = root;
@@ -268,7 +268,7 @@ impl HeapNode {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Copy)]
 struct TreeNode {
     left_ptr: *const TreeNode,
     right_ptr: *const TreeNode,
@@ -314,8 +314,9 @@ mod bench {
     fn decode_message(bencher: Bencher, case: &Case) {
         let response_bytes = case.request();
         let packet = &Packet::new(&response_bytes);
-        let tree = &huffman_tree(packet);
-        let table = unsafe { symbols_table_unchecked(tree) };
+        let mut tree = [TreeNode::default(); MAX_TREE_LEN];
+        huffman_tree(packet, &mut tree);
+        let table = unsafe { symbols_table_unchecked(&tree) };
         bencher
             .counter(BytesCount::from(packet.decoded_bytes_len))
             .bench_local(move || {

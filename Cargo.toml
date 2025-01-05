@@ -23,8 +23,9 @@ members = [
 
 [workspace.dependencies]
 common = { version = "*", path = "common" }
-mimalloc = "0.1.43"
 divan = "0.1.17"
+heapless = "0.8.0"
+mimalloc = "0.1.43"
 
 [dev-dependencies]
 divan = "0.1.17"
@@ -40,8 +41,6 @@ flat_unsafe_ptr = { version = "*", path = "flat_unsafe_ptr" }
 table_index = { version = "*", path = "table_index" }
 table_ptr = { version = "*", path = "table_ptr" }
 table_unsafe_ptr = { version = "*", path = "table_unsafe_ptr" }
-
-profile_bin = { version = "*", path = "profile_bin" }
 
 [[bench]]
 name = "benches"

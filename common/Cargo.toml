@@ -4,5 +4,6 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-mimalloc = { workspace = true }
 divan = { workspace = true }
+heapless = { workspace = true }
+mimalloc = { workspace = true }

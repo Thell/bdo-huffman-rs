@@ -1,23 +1,25 @@
 use common::min_heap::*;
 use common::packet::Packet;
 
+const MAX_TREE_LEN: usize = 23;
+
 pub fn decode_packet(content: &[u8]) -> String {
     let packet = &Packet::new(content);
-    let tree = &huffman_tree(packet);
-    unsafe { decode_message(packet, tree) }
+    let mut tree = [TreeNode::default(); MAX_TREE_LEN];
+    huffman_tree(packet, &mut tree);
+    unsafe { decode_message(packet, &tree) }
 }
 
-unsafe fn decode_message(packet: &Packet, tree: &[TreeNode]) -> String {
+unsafe fn decode_message(packet: &Packet, tree: &[TreeNode; MAX_TREE_LEN]) -> String {
     let mut decoded: Vec<u8> = Vec::with_capacity(packet.decoded_bytes_len as usize);
     let mut write_index = 0;
     let root = unsafe { tree.get_unchecked(0) };
     let mut node = root;
     let mut read_index = 0;
 
-    'outer: loop {
+    while read_index < packet.encoded_bytes_len as usize - 1 {
         let mut bits = *packet.encoded_message.get_unchecked(read_index);
         read_index += 1;
-
         for _ in 0..8 {
             let direction = ((bits & 0b1000_0000) != 0) as usize;
             bits <<= 1;
@@ -31,11 +33,29 @@ unsafe fn decode_message(packet: &Packet, tree: &[TreeNode]) -> String {
             if let Some(symbol) = node.symbol {
                 *decoded.as_mut_ptr().add(write_index) = symbol;
                 write_index += 1;
-                if write_index == packet.decoded_bytes_len as usize {
-                    break 'outer;
-                }
                 node = root;
             }
+        }
+    }
+
+    let mut bits = *packet.encoded_message.get_unchecked(read_index);
+    for _ in 0..8 {
+        let direction = ((bits & 0b1000_0000) != 0) as usize;
+        bits <<= 1;
+        node = (*(&node.left_ptr as *const _ as *const *const TreeNode)
+            .add(direction)
+            .as_ref()
+            .unwrap_unchecked())
+        .as_ref()
+        .unwrap_unchecked();
+
+        if let Some(symbol) = node.symbol {
+            *decoded.as_mut_ptr().add(write_index) = symbol;
+            write_index += 1;
+            if write_index == packet.decoded_bytes_len as usize {
+                break;
+            }
+            node = root;
         }
     }
 
@@ -44,12 +64,10 @@ unsafe fn decode_message(packet: &Packet, tree: &[TreeNode]) -> String {
     std::str::from_utf8_unchecked(slice).to_owned()
 }
 
-fn huffman_tree(packet: &Packet) -> Vec<TreeNode> {
+fn huffman_tree(packet: &Packet, tree: &mut [TreeNode; MAX_TREE_LEN]) {
     let mut heap = unsafe { symbols_heap(packet) };
 
-    let mut right_index = 2 * packet.symbol_count as usize - 1;
-    let mut tree = vec![TreeNode::default(); right_index];
-    right_index -= 1;
+    let mut right_index = 2 * packet.symbol_count as usize - 2;
 
     // Successively move two smallest nodes from heap to tree
     loop {
@@ -79,11 +97,10 @@ fn huffman_tree(packet: &Packet) -> Vec<TreeNode> {
             heap.push(parent);
         }
     }
-    tree
 }
 
-unsafe fn symbols_heap(packet: &Packet) -> MinHeap<HeapNode> {
-    let mut heap = MinHeap::<HeapNode>::new();
+unsafe fn symbols_heap(packet: &Packet) -> MinHeapless<HeapNode> {
+    let mut heap = MinHeapless::<HeapNode>::new();
     let ptr = packet.symbol_frequency_bytes.as_ptr();
     for i in 0..packet.symbol_count {
         let freq_ptr = ptr.add(i as usize * 8) as *const u32;
@@ -140,7 +157,7 @@ impl HeapNode {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Copy)]
 struct TreeNode {
     left_ptr: *const TreeNode,
     right_ptr: *const TreeNode,
@@ -186,7 +203,8 @@ mod bench {
     fn decode_message(bencher: Bencher, case: &Case) {
         let response_bytes = case.request();
         let packet = &Packet::new(&response_bytes);
-        let tree = huffman_tree(packet);
+        let mut tree = [TreeNode::default(); MAX_TREE_LEN];
+        huffman_tree(packet, &mut tree);
         bencher
             .counter(BytesCount::from(packet.decoded_bytes_len))
             .bench_local(move || {

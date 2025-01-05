@@ -49,8 +49,8 @@ fn huffman_tree(packet: &Packet) -> HeapNode {
     heap.pop()
 }
 
-fn symbols_heap(packet: &Packet) -> MinHeap<HeapNode> {
-    let mut heap = MinHeap::<HeapNode>::new();
+fn symbols_heap(packet: &Packet) -> MinHeapless<HeapNode> {
+    let mut heap = MinHeapless::<HeapNode>::new();
     let bytes = &packet.symbol_frequency_bytes;
     for i in 0..packet.symbol_count {
         let pos = (i as usize) * 8;
