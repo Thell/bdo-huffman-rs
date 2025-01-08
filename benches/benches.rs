@@ -1,5 +1,7 @@
 #![allow(unused)]
 
+use std::hint::black_box;
+
 use common;
 
 use baseline;
@@ -17,4 +19,31 @@ use table_unsafe_ptr;
 
 fn main() {
     divan::main();
+}
+
+#[divan::bench(sample_count = 10_000)]
+fn all_samples(bencher: divan::Bencher) {
+    let mut samples = Vec::new();
+    for sample in common::test_cases::SAMPLE_CASES {
+        samples.push(sample.request());
+    }
+    let mut encoded_len = 0;
+    let mut decoded_len = 0;
+    for content in samples.iter() {
+        let packet = common::packet::Packet::new(&content);
+        encoded_len += packet.encoded_bytes_len;
+        decoded_len += packet.decoded_bytes_len;
+    }
+    println!("\ntotal encoded_len: {}", encoded_len);
+    println!("total decoded_len: {}", decoded_len);
+    bencher.bench_local(move || {
+        for content in samples.iter() {
+            let packet = common::packet::Packet::new(&content);
+            if packet.encoded_bytes_len < 100 {
+                black_box(flat_unsafe_ptr::decode_packet(&content));
+            } else {
+                black_box(table_unsafe_ptr::decode_packet(&content));
+            }
+        }
+    });
 }
