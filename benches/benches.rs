@@ -39,7 +39,7 @@ fn all_samples(bencher: divan::Bencher) {
     bencher.bench_local(move || {
         for content in samples.iter() {
             let packet = common::packet::Packet::new(&content);
-            if packet.encoded_bytes_len < 100 {
+            if packet.encoded_bytes_len <= 128 {
                 black_box(flat_unsafe_ptr::decode_packet(&content));
             } else {
                 black_box(table_unsafe_ptr::decode_packet(&content));

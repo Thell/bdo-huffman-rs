@@ -5,4 +5,5 @@ edition = "2021"
 
 [dependencies]
 common = { workspace = true }
+heapless = { workspace = true }
 divan = { workspace = true }

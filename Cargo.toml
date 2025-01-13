@@ -47,4 +47,4 @@ name = "benches"
 harness = false
 
 [profile.release]
-debug = true
+debug = false

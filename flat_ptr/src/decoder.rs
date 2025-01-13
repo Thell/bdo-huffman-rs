@@ -12,30 +12,37 @@ pub fn decode_packet(content: &[u8]) -> String {
 
 fn decode_message(packet: &Packet, tree: &[TreeNode; MAX_TREE_LEN]) -> String {
     let mut decoded: Vec<u8> = vec![0; packet.decoded_bytes_len as usize];
+    let mut write_index = 0;
     let root = &tree[0];
     let mut node = root;
-    let mut write_index = 0;
 
-    'outer: for byte in packet.encoded_message.iter() {
-        let mut bits = *byte;
-
+    let (last_byte, bytes) = packet.encoded_message.split_last().unwrap();
+    for &byte in bytes {
+        let mut bits = byte;
         for _ in 0..8 {
-            let direction = (bits & 0b1000_0000) != 0;
+            let direction = (bits >> 7) as usize;
             bits <<= 1;
-
-            node = match direction {
-                true => unsafe { &*node.right_ptr },
-                false => unsafe { &*node.left_ptr },
-            };
-
+            node = unsafe { step(direction, node) };
             if let Some(symbol) = node.symbol {
                 decoded[write_index] = symbol;
                 write_index += 1;
-                if write_index == packet.decoded_bytes_len as usize {
-                    break 'outer;
-                }
                 node = root;
             }
+        }
+    }
+
+    let mut bits = *last_byte;
+    for _ in 0..8 {
+        let direction = (bits >> 7) as usize;
+        bits <<= 1;
+        node = unsafe { step(direction, node) };
+        if let Some(symbol) = node.symbol {
+            decoded[write_index] = symbol;
+            write_index += 1;
+            if write_index == packet.decoded_bytes_len as usize {
+                break;
+            }
+            node = root;
         }
     }
 
@@ -43,40 +50,59 @@ fn decode_message(packet: &Packet, tree: &[TreeNode; MAX_TREE_LEN]) -> String {
     std::str::from_utf8(slice).unwrap().to_owned()
 }
 
-fn huffman_tree(packet: &Packet, tree: &mut [TreeNode; MAX_TREE_LEN]) {
-    let mut heap = symbols_heap(packet);
+#[inline(always)]
+unsafe fn step(direction: usize, node: &TreeNode) -> &TreeNode {
+    match direction {
+        0 => unsafe { &*node.left_ptr },
+        _ => unsafe { &*node.right_ptr },
+    }
+}
 
-    let mut right_index = 2 * packet.symbol_count as usize - 1;
-    right_index -= 1;
-
-    // Successively move two smallest nodes from heap to tree
-    loop {
-        let left = heap.pop();
-        let right = heap.pop();
-        let parent_frequency = left.frequency + right.frequency;
-
-        // Add popped nodes to the tree by setting the existing node values
-        tree[right_index - 1].symbol = left.symbol;
-        tree[right_index].symbol = right.symbol;
-        tree[right_index - 1].left_ptr = &tree[left.left_index as usize] as *const TreeNode;
-        tree[right_index].left_ptr = &tree[right.left_index as usize] as *const TreeNode;
-        tree[right_index - 1].right_ptr = &tree[left.right_index as usize] as *const TreeNode;
-        tree[right_index].right_ptr = &tree[right.right_index as usize] as *const TreeNode;
-
-        if right_index < 3 {
-            // Move the last node (the root) to the tree
-            tree[0].symbol = None;
-            tree[0].left_ptr = &tree[1] as *const TreeNode;
-            tree[0].right_ptr = &tree[2] as *const TreeNode;
-            break;
+#[inline(always)]
+fn process_heap_node(node: &HeapNode, tree: &mut [TreeNode; MAX_TREE_LEN], index: usize) {
+    unsafe {
+        if node.symbol.is_some() {
+            tree.get_unchecked_mut(index).symbol = node.symbol;
         } else {
-            // Add a parent node to the heap for ordering
-            let parent =
-                HeapNode::new_parent(parent_frequency, right_index as u8 - 1, right_index as u8);
-            right_index -= 2;
-            heap.push(parent);
+            tree.get_unchecked_mut(index).left_ptr =
+                tree.get_unchecked(node.tree_index as usize) as *const TreeNode;
+            tree.get_unchecked_mut(index).right_ptr =
+                tree.get_unchecked(node.tree_index as usize + 1) as *const TreeNode;
         }
     }
+}
+
+fn huffman_tree(packet: &Packet, tree: &mut [TreeNode; MAX_TREE_LEN]) {
+    // Set the root node.
+    tree[0].symbol = None;
+    tree[0].left_ptr = &tree[1] as *const TreeNode;
+    tree[0].right_ptr = &tree[2] as *const TreeNode;
+
+    let mut heap = symbols_heap(packet);
+    let mut tree_index = 2 * packet.symbol_count as usize - 1;
+
+    // Successively move two smallest nodes from heap to tree
+    while tree_index > 3 {
+        let (left, right) = (heap.pop(), heap.pop());
+
+        // Add heap popped nodes to the tree by setting the existing node values
+        tree_index -= 1;
+        process_heap_node(&right, tree, tree_index);
+        tree_index -= 1;
+        process_heap_node(&left, tree, tree_index);
+
+        // Add a parent node to the heap for ordering
+        let parent_frequency = left.frequency + right.frequency;
+        let parent = HeapNode::new_parent(parent_frequency, tree_index as u8);
+        heap.push(parent);
+    }
+
+    // Move the last two nodes.
+    let (left, right) = (heap.pop(), heap.pop());
+    tree_index -= 1;
+    process_heap_node(&right, tree, tree_index);
+    tree_index -= 1;
+    process_heap_node(&left, tree, tree_index);
 }
 
 fn symbols_heap(packet: &Packet) -> MinHeapless<HeapNode> {
@@ -93,8 +119,7 @@ fn symbols_heap(packet: &Packet) -> MinHeapless<HeapNode> {
 
 #[derive(PartialEq, Eq)]
 struct HeapNode {
-    left_index: u8,
-    right_index: u8,
+    tree_index: u8,
     symbol: Option<u8>,
     frequency: u32,
 }
@@ -119,16 +144,14 @@ impl PartialOrd for HeapNode {
 impl HeapNode {
     fn new(symbol: Option<u8>, frequency: u32) -> Self {
         Self {
-            left_index: 0,
-            right_index: 0,
+            tree_index: 0,
             symbol,
             frequency,
         }
     }
-    fn new_parent(frequency: u32, left_index: u8, right_index: u8) -> Self {
+    fn new_parent(frequency: u32, left_index: u8) -> Self {
         Self {
-            left_index,
-            right_index,
+            tree_index: left_index,
             symbol: None,
             frequency,
         }
@@ -176,6 +199,17 @@ mod bench {
 
     use divan::counter::BytesCount;
     use divan::{black_box, Bencher};
+
+    #[divan::bench(sample_count = 100_000, args = [ALL_CASES[0], ALL_CASES[5]])]
+    fn gen_tree(bencher: Bencher, case: &Case) {
+        let response_bytes = case.request();
+        let packet = &Packet::new(&response_bytes);
+        bencher.bench_local(move || {
+            let mut tree = [TreeNode::default(); MAX_TREE_LEN];
+            huffman_tree(packet, &mut tree);
+            black_box(tree);
+        });
+    }
 
     #[divan::bench(args = ALL_CASES)]
     fn decode_message(bencher: Bencher, case: &Case) {

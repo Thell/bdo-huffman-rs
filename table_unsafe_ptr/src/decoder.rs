@@ -9,7 +9,7 @@ pub fn decode_packet(content: &[u8]) -> String {
     let packet = &Packet::new(content);
     let mut tree = [TreeNode::default(); MAX_TREE_LEN];
     huffman_tree(packet, &mut tree);
-    let table = unsafe { &symbols_table_unchecked(&tree) };
+    let table = &symbols_table(&tree);
     decode_message(packet, table)
 }
 
@@ -53,6 +53,8 @@ fn decode_message(packet: &Packet, table: &SymbolTable) -> String {
     }
 
     // Drain partial byte remaining bits with peek checks.
+    // should also use  `&& write_index < packet.decoded_bytes_len as usize` for equality with
+    // the safe and _ptr versions.
     while bit_reader.has_bits_remaining(1) {
         unsafe { lookup_bits_unchecked(&mut bit_reader, table, &mut write_index, &mut decoded) }
     }
@@ -117,7 +119,7 @@ unsafe fn copy_symbols_unchecked(symbols: &[u8], write_index: &mut usize, decode
 }
 
 fn huffman_tree(packet: &Packet, tree: &mut [TreeNode; MAX_TREE_LEN]) {
-    let mut heap = unsafe { symbols_heap(packet) };
+    let mut heap = symbols_heap(packet);
     let mut right_index = 2 * packet.symbol_count as usize - 2;
 
     // Successively move two smallest nodes from heap to tree
@@ -150,15 +152,14 @@ fn huffman_tree(packet: &Packet, tree: &mut [TreeNode; MAX_TREE_LEN]) {
     }
 }
 
-unsafe fn symbols_heap(packet: &Packet) -> MinHeapless<HeapNode> {
+fn symbols_heap(packet: &Packet) -> MinHeapless<HeapNode> {
     let mut heap = MinHeapless::<HeapNode>::new();
     let ptr = packet.symbol_frequency_bytes.as_ptr();
     for i in 0..packet.symbol_count {
-        let freq_ptr = ptr.add(i as usize * 8) as *const u32;
-        let symbol_ptr = ptr.add(i as usize * 8 + 4);
-
-        let frequency = freq_ptr.read_unaligned();
-        let symbol = symbol_ptr.read();
+        let freq_ptr = ptr.wrapping_add(i as usize * 8) as *const u32;
+        let symbol_ptr = ptr.wrapping_add(i as usize * 8 + 4);
+        let frequency = unsafe { freq_ptr.read_unaligned() };
+        let symbol = unsafe { symbol_ptr.read() };
         heap.push(HeapNode::new(Some(symbol), frequency));
     }
     heap
@@ -167,7 +168,6 @@ unsafe fn symbols_heap(packet: &Packet) -> MinHeapless<HeapNode> {
 #[repr(C)]
 struct SymbolTable {
     bits_used: [u8; 256],
-    // _pad: [u8; 256],
     symbols: [[u8; 6]; 256],
 }
 
@@ -175,49 +175,43 @@ impl Default for SymbolTable {
     fn default() -> Self {
         SymbolTable {
             bits_used: [0u8; 256],
-            // _pad: [0u8; 256],
             symbols: [[0u8; 6]; 256],
         }
     }
 }
 
 #[inline(always)]
-unsafe fn symbols_table_unchecked(tree: &[TreeNode]) -> SymbolTable {
+fn symbols_table(tree: &[TreeNode; 23]) -> SymbolTable {
     // Generate a multi-symbol lookup table.
     // Decodes all 8 step paths through the tree storing each symbol visited,
     // the number of symbols written, and the number of bits used when the
     // last symbol was visited.
     let mut table = SymbolTable::default();
-    let root = tree.get_unchecked(0);
+    let root = &tree[0];
 
     for byte in 0u8..=255 {
-        let symbols_ptr = table.symbols.get_unchecked_mut(byte as usize).as_mut_ptr();
-
+        let symbols = &mut table.symbols[byte as usize];
         let mut node = root;
         let mut bits = byte;
         let mut bits_used = 0;
         let mut write_index = 0;
 
-        for i in 0..8 {
-            let direction = ((bits & 0b1000_0000) != 0) as usize;
-            bits <<= 1;
-            node = (*(&node.left_ptr as *const _ as *const *const TreeNode)
-                .add(direction)
-                .as_ref()
-                .unwrap_unchecked())
-            .as_ref()
-            .unwrap_unchecked();
-
+        for i in 0..=7 {
+            node = match bits >> 7 {
+                0 => unsafe { &*node.left_ptr },
+                _ => unsafe { &*node.right_ptr },
+            };
             if let Some(symbol) = node.symbol {
-                *symbols_ptr.add(write_index) = symbol;
-                write_index += 1;
+                symbols[write_index] = symbol;
                 bits_used = i + 1;
+                write_index += 1;
                 if write_index == 5 {
                     // The sixth position is a sentinel `0`
                     break;
                 }
                 node = root;
             }
+            bits <<= 1;
         }
         table.bits_used[byte as usize] = bits_used;
     }
@@ -231,13 +225,11 @@ struct HeapNode {
     symbol: Option<u8>,
     frequency: u32,
 }
-
 impl MinHeapNode for HeapNode {
     fn frequency(&self) -> u32 {
         self.frequency
     }
 }
-
 impl Ord for HeapNode {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
         self.frequency.cmp(&other.frequency)
@@ -248,7 +240,6 @@ impl PartialOrd for HeapNode {
         Some(self.cmp(other))
     }
 }
-
 impl HeapNode {
     fn new(symbol: Option<u8>, frequency: u32) -> Self {
         Self {
@@ -274,7 +265,6 @@ struct TreeNode {
     right_ptr: *const TreeNode,
     symbol: Option<u8>,
 }
-
 impl Default for TreeNode {
     fn default() -> Self {
         Self {
@@ -310,13 +300,36 @@ mod bench {
     use divan::counter::BytesCount;
     use divan::{black_box, Bencher};
 
+    #[divan::bench(sample_count = 100_000, args = [ALL_CASES[0], ALL_CASES[5]])]
+    fn gen_tree(bencher: Bencher, case: &Case) {
+        let response_bytes = case.request();
+        let packet = &Packet::new(&response_bytes);
+        bencher.bench_local(move || {
+            let mut tree = [TreeNode::default(); MAX_TREE_LEN];
+            huffman_tree(packet, &mut tree);
+            black_box(tree);
+        });
+    }
+
+    #[divan::bench(sample_count = 1_000_000, args = [ALL_CASES[0], ALL_CASES[5]])]
+    fn gen_table(bencher: Bencher, case: &Case) {
+        let response_bytes = case.request();
+        let packet = &Packet::new(&response_bytes);
+        bencher.bench_local(move || {
+            let mut tree = [TreeNode::default(); MAX_TREE_LEN];
+            huffman_tree(packet, &mut tree);
+            let table = symbols_table(&tree);
+            black_box(table);
+        });
+    }
+
     #[divan::bench(args = ALL_CASES)]
     fn decode_message(bencher: Bencher, case: &Case) {
         let response_bytes = case.request();
         let packet = &Packet::new(&response_bytes);
         let mut tree = [TreeNode::default(); MAX_TREE_LEN];
         huffman_tree(packet, &mut tree);
-        let table = unsafe { symbols_table_unchecked(&tree) };
+        let table = symbols_table(&tree);
         bencher
             .counter(BytesCount::from(packet.decoded_bytes_len))
             .bench_local(move || {

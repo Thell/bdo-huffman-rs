@@ -92,7 +92,7 @@ impl<T: MinHeapNode + std::cmp::PartialOrd> MinHeapless<T> {
     }
 
     pub fn push(&mut self, node: T) {
-        let _ = self.0.push(node);
+        let _ = unsafe { self.0.push_unchecked(node) };
         let mut child = self.0.len() - 1;
 
         while child > 0 {

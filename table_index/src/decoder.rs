@@ -3,10 +3,13 @@ use common::packet::Packet;
 
 use bitter::{BigEndianReader, BitReader};
 
+const MAX_TREE_LEN: usize = 23;
+
 pub fn decode_packet(content: &[u8]) -> String {
     let packet = &Packet::new(content);
-    let tree = &huffman_tree(packet);
-    let table = &symbols_table(tree);
+    let mut tree = [HeapNode::default(); MAX_TREE_LEN];
+    huffman_tree(packet, &mut tree);
+    let table = &symbols_table(&tree);
     decode_message(packet, table)
 }
 
@@ -29,6 +32,11 @@ fn decode_message(packet: &Packet, table: &SymbolTable) -> String {
         lookup_byte(&mut bit_reader, table, &mut write_index, &mut decoded);
         lookup_byte(&mut bit_reader, table, &mut write_index, &mut decoded);
         lookup_byte(&mut bit_reader, table, &mut write_index, &mut decoded);
+        // Since the checked `refill_lookahead` is more expensive than the lookup
+        // this improves performance on medium_small+ sized msgs.
+        while bit_reader.lookahead_bits() >= 8 {
+            lookup_byte(&mut bit_reader, table, &mut write_index, &mut decoded);
+        }
     }
 
     // Drain unbuffered bytes with safe refill.
@@ -100,12 +108,9 @@ fn copy_symbols(symbols: &[u8], write_index: &mut usize, decoded: &mut [u8]) {
     }
 }
 
-fn huffman_tree(packet: &Packet) -> Vec<HeapNode> {
+fn huffman_tree(packet: &Packet, tree: &mut [HeapNode; MAX_TREE_LEN]) {
     let mut heap = symbols_heap(packet);
-
-    let mut right_index = 2 * packet.symbol_count as usize - 1;
-    let mut tree = vec![HeapNode::default(); right_index];
-    right_index -= 1;
+    let mut right_index = 2 * packet.symbol_count as usize - 2;
 
     // Successively move two smallest nodes from heap to tree
     loop {
@@ -114,33 +119,35 @@ fn huffman_tree(packet: &Packet) -> Vec<HeapNode> {
         let parent_frequency = left.frequency + right.frequency;
 
         // Add popped nodes to the tree by setting the existing node values
-        tree[right_index - 1] = left;
-        tree[right_index] = right;
+        tree[right_index - 1].symbol = left.symbol;
+        tree[right_index].symbol = right.symbol;
+        tree[right_index - 1].left_index = left.left_index;
+        tree[right_index].left_index = right.left_index;
+        tree[right_index - 1].right_index = left.right_index;
+        tree[right_index].right_index = right.right_index;
 
-        // Add a parent node to the heap for ordering
-        heap.push(HeapNode::new_parent(
-            parent_frequency,
-            right_index as u8 - 1,
-            right_index as u8,
-        ));
-
-        right_index -= 2;
-        if right_index < 2 {
-            // Move the last node (the root) to the tree vec
-            tree[0] = heap.pop();
+        if right_index < 3 {
+            // Move the last node (the root) to the tree
+            tree[0].symbol = None;
+            tree[0].left_index = 1;
+            tree[0].right_index = 2;
             break;
+        } else {
+            // Add a parent node to the heap for ordering
+            let parent =
+                HeapNode::new_parent(parent_frequency, right_index as u8 - 1, right_index as u8);
+            right_index -= 2;
+            heap.push(parent);
         }
     }
-    tree
 }
 
-fn symbols_heap(packet: &Packet) -> MinHeap<HeapNode> {
-    let mut heap = MinHeap::<HeapNode>::new();
+fn symbols_heap(packet: &Packet) -> MinHeapless<HeapNode> {
+    let mut heap = MinHeapless::<HeapNode>::new();
     let bytes = &packet.symbol_frequency_bytes;
-    for i in 0..packet.symbol_count {
-        let pos = (i as usize) * 8;
-        let frequency = u32::from_le_bytes(bytes[pos..pos + 4].try_into().unwrap());
-        let symbol = bytes[pos + 4];
+    for chunk in bytes.chunks_exact(8) {
+        let frequency = u32::from_le_bytes(chunk[..4].try_into().unwrap());
+        let symbol = chunk[4];
         heap.push(HeapNode::new(Some(symbol), frequency));
     }
     heap
@@ -161,6 +168,7 @@ impl Default for SymbolTable {
     }
 }
 
+#[inline(always)]
 fn symbols_table(tree: &[HeapNode]) -> SymbolTable {
     // Generate a multi-symbol lookup table.
     // Decodes all 8 step paths through the tree storing each symbol visited,
@@ -176,43 +184,40 @@ fn symbols_table(tree: &[HeapNode]) -> SymbolTable {
         let mut bits_used = 0;
         let mut write_index = 0;
 
-        for i in 0..8 {
-            let direction = (bits & 0b1000_0000) != 0;
-            bits <<= 1;
-
-            node = match direction {
-                true => &tree[node.right_index as usize],
-                false => &tree[node.left_index as usize],
+        for i in 0..=7 {
+            node = match bits >> 7 {
+                0 => &tree[node.left_index as usize],
+                _ => &tree[node.right_index as usize],
             };
             if let Some(symbol) = node.symbol {
                 symbols[write_index] = symbol;
-                write_index += 1;
                 bits_used = i + 1;
-                if write_index == 6 {
+                write_index += 1;
+                if write_index == 5 {
+                    // The sixth position is a sentinel `0`
                     break;
                 }
                 node = root;
             }
+            bits <<= 1;
         }
         table.bits_used[byte as usize] = bits_used;
     }
     table
 }
 
-#[derive(Clone, Default, PartialEq, Eq)]
+#[derive(Clone, Copy, Default, PartialEq, Eq)]
 struct HeapNode {
     left_index: u8,
     right_index: u8,
     symbol: Option<u8>,
     frequency: u32,
 }
-
 impl MinHeapNode for HeapNode {
     fn frequency(&self) -> u32 {
         self.frequency
     }
 }
-
 impl Ord for HeapNode {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
         self.frequency.cmp(&other.frequency)
@@ -223,7 +228,6 @@ impl PartialOrd for HeapNode {
         Some(self.cmp(other))
     }
 }
-
 impl HeapNode {
     fn new(symbol: Option<u8>, frequency: u32) -> Self {
         Self {
@@ -268,12 +272,36 @@ mod bench {
     use divan::counter::BytesCount;
     use divan::{black_box, Bencher};
 
+    #[divan::bench(sample_count = 100_000, args = [ALL_CASES[0], ALL_CASES[5]])]
+    fn gen_tree(bencher: Bencher, case: &Case) {
+        let response_bytes = case.request();
+        let packet = &Packet::new(&response_bytes);
+        bencher.bench_local(move || {
+            let mut tree = [HeapNode::default(); MAX_TREE_LEN];
+            huffman_tree(packet, &mut tree);
+            black_box(tree);
+        });
+    }
+
+    #[divan::bench(sample_count = 100_000, args = [ALL_CASES[0], ALL_CASES[5]])]
+    fn gen_table(bencher: Bencher, case: &Case) {
+        let response_bytes = case.request();
+        let packet = &Packet::new(&response_bytes);
+        bencher.bench_local(move || {
+            let mut tree = [HeapNode::default(); MAX_TREE_LEN];
+            huffman_tree(packet, &mut tree);
+            let table = symbols_table(&tree);
+            black_box(table);
+        });
+    }
+
     #[divan::bench(args = ALL_CASES)]
     fn decode_message(bencher: Bencher, case: &Case) {
         let response_bytes = case.request();
         let packet = &Packet::new(&response_bytes);
-        let tree = &huffman_tree(packet);
-        let table = symbols_table(tree);
+        let mut tree = [HeapNode::default(); MAX_TREE_LEN];
+        huffman_tree(packet, &mut tree);
+        let table = symbols_table(&tree);
         bencher
             .counter(BytesCount::from(packet.decoded_bytes_len))
             .bench_local(move || {
