@@ -14,41 +14,37 @@ Clone the repo and run either:
 ## Full Packet Processing Results
 
 The table below highlights how data layout and algorithm choice impacted
-performance. The different design decisions are detailed later.
+performance.
 
-The timings in the table include all steps to parse and decode the packet.
 Times are the average 1,000,000 samples, lower is better.
 
-| Approach      | Safety | Child |    70.5k     |    33.3k     |    22.5k     |    11.1k     |     5.5k     |     40b      | Decoding Throughput¹ |
-|---------------|:------:|:-----:|:------------:|:------------:|:------------:|:------------:|:------------:|:------------:|:--------------------:|
-| **Python**    |   🙏   |  Box  |   1.937 ms   |   625.0 µs   |   438.0 µs   |   156.0 µs   |   78.00 µs   |   6.250 µs   |      38.70 MB/s      |
-| **Original**  |   ✅    |  Box  |   398.4 µs   |   177.2 µs   |   113.0 µs   |   53.59 µs   |   38.98 µs   |   1.375 µs   |      187.7 MB/s      |
-|               |        |       |              |              |              |              |              |              |                      |
-| **BaseLine**  |   ✅    |  Box  |   339.1 µs   |   157.2 µs   |   102.4 µs   |   45.39 µs   |   42.18 µs   |   510.6 ns   |      219.9 MB/s      |
-|               |        |       |              |              |              |              |              |              |                      |
-| **Nested**    |   ✅    |  Box  |   301.3 µs   |   135.8 µs   |   80.74 µs   |   26.24 µs   |   17.28 µs   |   511.9 ns   |      235.1 MB/s      |
-| **Nested**    |   ❌    |  Box  |   176.5 µs   |   63.15 µs   |   26.78 µs   |   13.34 µs   |   8.041 µs   |   414.8 ns   |      400.5 MB/s      |
-|               |        |       |              |              |              |              |              |              |                      |
-| **Flat**      |   ✅    | Index |   295.4 µs   |   133.7 µs   |   75.99 µs   |   25.74 µs   |   17.02 µs   |   190.1 ns   |      238.8 MB/s      |
-| **Flat**      |   ❓    | Const |   177.3 µs   |   64.21 µs   |   26.97 µs   |   13.35 µs   |   7.915 µs   |   175.5 ns   |      392.9 MB/s      |
-| **Flat**      |   ❌    | Const |   173.1 µs   |   52.85 µs   |   26.27 µs   |   12.95 µs   |   7.711 µs   | **146.9 ns** |      399.4 MB/s      |
-|               |        |       |              |              |              |              |              |              |                      |
-| **Table**     |   ✅    | Index |   58.84 µs   |   28.43 µs   |   19.45 µs   |   10.31 µs   |   6.683 µs   |   1.859 µs   |      1.235 GB/s      |
-| **Table**     |   ❓    | Const |   57.36 µs   |   27.28 µs   |   18.51 µs   |   9.440 µs   |   5.804 µs   |   951.3 ns   |      1.251 GB/s      |
-| **Table**     |   ❌    | Const | **51.19 µs** | **24.36 µs** | **16.69 µs** | **8.506 µs** | **5.283 µs** |   937.4 ns   |      1.409 GB/s      |
-|               |        |       |              |              |              |              |              |              |                      |
-| Python/Best   |        |       |     37.8     |     25.7     |     26.2     |     18.3     |     14.8     |     42.5     |                      |
-| Original/Best |        |       |     7.8      |     7.3      |     6.8      |     6.3      |     7.4      |     9.4      |                      |
+| Approach     | Safety | Child |  70.5k   |  33.3k   |  22.5k   |  11.1k   |   5.5k   |   40b    |
+|--------------|:------:|:-----:|:--------:|:--------:|:--------:|:--------:|:--------:|:--------:|
+| **Original** |   ✅    |  Box  | 398.4 µs | 177.2 µs | 113.0 µs | 53.59 µs | 38.98 µs | 1.375 µs |
+| **BaseLine** |   ✅    |  Box  | 339.1 µs | 157.2 µs | 102.4 µs | 45.39 µs | 42.18 µs | 510.6 ns |
+|              |        |       |          |          |          |          |          |          |
+| **Nested**   |   ✅    |  Box  | 301.3 µs | 135.8 µs | 80.74 µs | 26.24 µs | 17.28 µs | 511.9 ns |
+| **Flat**     |   ✅    | Index | 295.4 µs | 133.7 µs | 75.99 µs | 25.74 µs | 17.02 µs | 190.1 ns |
+| **S-Table**  |   ✅    | Index | 142.9 µs | 64.84 µs | 43.24 µs | 21.51 µs | 10.60 µs | 278.5 µs |
+| **M-Table**  |   ✅    | Index | 58.84 µs | 28.43 µs | 19.45 µs | 10.31 µs | 6.683 µs | 1.859 µs |
+|              |        |       |          |          |          |          |          |          |
+| **Nested**   |   ❌    |  Box  | 176.5 µs | 63.15 µs | 26.78 µs | 13.34 µs | 8.041 µs | 414.8 ns |
+| **Flat**     |   ❌    | Const | 173.1 µs | 52.85 µs | 26.27 µs | 12.95 µs | 7.711 µs | 146.9 ns |
+| **S-Table**  |   ❌    | Const | 121.3 µs | 54.68 µs | 36.01 µs | 17.09 µs | 8.978 µs | 248.1 µs |
+| **M-Table**  |   ❌    | Const | 51.19 µs | 24.36 µs | 16.69 µs | 8.506 µs | 5.283 µs | 937.4 ns |
 
 ✅ Entirely safe code; no unsafe operations anywhere.  
-❓ Uses only const pointer dereferences as the sole unsafe operation, otherwise safe.  
-❌ Includes many unsafe practices like unchecked accesses, raw pointer manipulations, and other explicit unsafe operations.  
-¹Measured 70.5k length message with decoded symbols as the unit.
+❌ Includes unsafe practices like unchecked accesses, raw pointer manipulations, and other explicit unsafe operations.  
 
-The '**original**' and '**baseline**' are the same decoding logic, timing improvements
+\* '**Original**' and '**Baseline**' have the same decoding logic, timing changes
 come from the packet parsing and tree building.
 
-Tested on a Ryzen 5700G.
+\* '**S-Table**'' and '**M-Table**'' use single-symbol and multi-symbol lookup tables.
+
+\* The timings in the table include all steps to parse and decode the packet.
+All aproaches use the same parser, except the original, which takes less than 3ns for all packets.
+
+\* Tested on a Ryzen 5700G.
 
 ## Decoding Approaches
 

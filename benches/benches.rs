@@ -17,6 +17,9 @@ use table_index;
 use table_ptr;
 use table_unsafe_ptr;
 
+use table_single_index;
+use table_single_unsafe_ptr;
+
 fn main() {
     divan::main();
 }

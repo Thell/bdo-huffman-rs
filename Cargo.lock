@@ -32,6 +32,8 @@ dependencies = [
  "paste",
  "table_index",
  "table_ptr",
+ "table_single_index",
+ "table_single_unsafe_ptr",
  "table_unsafe_ptr",
 ]
 
@@ -328,6 +330,24 @@ dependencies = [
 
 [[package]]
 name = "table_ptr"
+version = "0.1.0"
+dependencies = [
+ "bitter",
+ "common",
+ "divan",
+]
+
+[[package]]
+name = "table_single_index"
+version = "0.1.0"
+dependencies = [
+ "bitter",
+ "common",
+ "divan",
+]
+
+[[package]]
+name = "table_single_unsafe_ptr"
 version = "0.1.0"
 dependencies = [
  "bitter",
