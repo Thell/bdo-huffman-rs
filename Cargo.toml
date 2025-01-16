@@ -19,6 +19,8 @@ members = [
     "table_unsafe_ptr",
     "table_single_index",
     "table_single_unsafe_ptr",
+    "state_table_index",
+    "state_table_unsafe",
 
     "profile_bin",
 ]
@@ -45,10 +47,12 @@ table_ptr = { version = "*", path = "table_ptr" }
 table_unsafe_ptr = { version = "*", path = "table_unsafe_ptr" }
 table_single_index = { version = "*", path = "table_single_index" }
 table_single_unsafe_ptr = { version = "*", path = "table_single_unsafe_ptr" }
+state_table_index = { version = "*", path = "state_table_index" }
+state_table_unsafe = { version = "*", path = "state_table_unsafe" }
 
 [[bench]]
 name = "benches"
 harness = false
 
 [profile.release]
-debug = false
+debug = true

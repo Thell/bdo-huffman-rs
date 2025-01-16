@@ -20,12 +20,15 @@ use table_unsafe_ptr;
 use table_single_index;
 use table_single_unsafe_ptr;
 
+use state_table_index;
+use state_table_unsafe;
+
 fn main() {
     divan::main();
 }
 
 #[divan::bench(sample_count = 10_000)]
-fn all_samples(bencher: divan::Bencher) {
+fn all_samples_mtable(bencher: divan::Bencher) {
     let mut samples = Vec::new();
     for sample in common::test_cases::SAMPLE_CASES {
         samples.push(sample.request());
@@ -46,6 +49,33 @@ fn all_samples(bencher: divan::Bencher) {
                 black_box(flat_unsafe_ptr::decode_packet(&content));
             } else {
                 black_box(table_unsafe_ptr::decode_packet(&content));
+            }
+        }
+    });
+}
+
+#[divan::bench(sample_count = 10_000)]
+fn all_samples_fsm(bencher: divan::Bencher) {
+    let mut samples = Vec::new();
+    for sample in common::test_cases::SAMPLE_CASES {
+        samples.push(sample.request());
+    }
+    let mut encoded_len = 0;
+    let mut decoded_len = 0;
+    for content in samples.iter() {
+        let packet = common::packet::Packet::new(&content);
+        encoded_len += packet.encoded_bytes_len;
+        decoded_len += packet.decoded_bytes_len;
+    }
+    println!("\ntotal encoded_len: {}", encoded_len);
+    println!("total decoded_len: {}", decoded_len);
+    bencher.bench_local(move || {
+        for content in samples.iter() {
+            let packet = common::packet::Packet::new(&content);
+            if packet.encoded_bytes_len <= 128 {
+                black_box(flat_unsafe_ptr::decode_packet(&content));
+            } else {
+                black_box(state_table_unsafe::decode_packet(&content));
             }
         }
     });

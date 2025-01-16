@@ -24,3 +24,5 @@ generate_test_cases!(nested_unsafe_box);
 generate_test_cases!(table_index);
 generate_test_cases!(table_ptr);
 generate_test_cases!(table_unsafe_ptr);
+generate_test_cases!(state_table_index);
+generate_test_cases!(state_table_unsafe);

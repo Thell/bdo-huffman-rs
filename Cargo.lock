@@ -30,6 +30,8 @@ dependencies = [
  "nested_box",
  "nested_unsafe_box",
  "paste",
+ "state_table_index",
+ "state_table_unsafe",
  "table_index",
  "table_ptr",
  "table_single_index",
@@ -264,6 +266,7 @@ dependencies = [
 name = "profile_bin"
 version = "0.1.0"
 dependencies = [
+ "bitter",
  "common",
  "mimalloc",
 ]
@@ -307,6 +310,24 @@ name = "stable_deref_trait"
 version = "1.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a8f112729512f8e442d81f95a8a7ddf2b7c6b8a1a6f509a95864142b30cab2d3"
+
+[[package]]
+name = "state_table_index"
+version = "0.1.0"
+dependencies = [
+ "bitter",
+ "common",
+ "divan",
+]
+
+[[package]]
+name = "state_table_unsafe"
+version = "0.1.0"
+dependencies = [
+ "bitter",
+ "common",
+ "divan",
+]
 
 [[package]]
 name = "syn"

@@ -1,9 +1,9 @@
 [package]
-name = "profile_bin"
+name = "state_table_index"
 version = "0.1.0"
 edition = "2021"
 
 [dependencies]
 common = { workspace = true }
 bitter = "0.7.1"
-mimalloc = { workspace = true }
+divan = { workspace = true }

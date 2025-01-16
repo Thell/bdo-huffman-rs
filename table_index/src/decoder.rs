@@ -252,12 +252,24 @@ impl HeapNode {
 
 #[cfg(test)]
 mod tests {
-    use common::test_cases::*;
+    use common::{packet::Packet, test_cases::*};
 
     #[test]
     fn decodes_packet() {
         let decoded_message = super::decode_packet(&TEST_BYTES);
         assert_eq!(decoded_message, EXPECTED_MESSAGE);
+    }
+
+    #[test]
+    fn gen_table() {
+        let response_bytes = TEST_BYTES;
+        let packet = &Packet::new(&response_bytes);
+        let mut tree = [super::HeapNode::default(); super::MAX_TREE_LEN];
+        super::huffman_tree(packet, &mut tree);
+        let table = super::symbols_table(&tree);
+        for i in 0..256 {
+            println!("{} {:?}", i, table.symbols[i]);
+        }
     }
 }
 
@@ -315,5 +327,21 @@ mod bench {
         bencher.bench_local(move || {
             super::decode_packet(black_box(&content));
         });
+    }
+
+    #[divan::bench(args = [ALL_CASES[0]])]
+    fn decode_message2x(bencher: Bencher, case: &Case) {
+        let content = case.request();
+        let content2 = content.clone();
+        let packet = &Packet::new(&content);
+        let mut tree = [HeapNode::default(); MAX_TREE_LEN];
+        huffman_tree(packet, &mut tree);
+        let table = symbols_table(&tree);
+        bencher
+            .counter(BytesCount::from(2 * packet.decoded_bytes_len))
+            .bench_local(move || {
+                black_box(super::decode_packet(black_box(&content2)));
+                black_box(super::decode_message(black_box(&packet), &table));
+            });
     }
 }

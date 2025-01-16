@@ -344,4 +344,20 @@ mod bench {
             super::decode_packet(black_box(&content));
         });
     }
+
+    #[divan::bench(args = [ALL_CASES[0]])]
+    fn decode_message2x(bencher: Bencher, case: &Case) {
+        let content = case.request();
+        let content2 = content.clone();
+        let packet = &Packet::new(&content);
+        let mut tree = [TreeNode::default(); MAX_TREE_LEN];
+        huffman_tree(packet, &mut tree);
+        let table = symbols_table(&tree);
+        bencher
+            .counter(BytesCount::from(2 * packet.decoded_bytes_len))
+            .bench_local(move || {
+                black_box(super::decode_packet(black_box(&content2)));
+                black_box(super::decode_message(black_box(&packet), &table));
+            });
+    }
 }
