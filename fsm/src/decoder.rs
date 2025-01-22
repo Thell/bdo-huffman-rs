@@ -14,7 +14,7 @@ pub fn decode_packet(content: &[u8]) -> String {
 
 fn decode_message(packet: &Packet, table: &StateTables) -> String {
     // Add slop space instead of checking write_index against decoded_len.
-    let mut decoded: Vec<u8> = Vec::with_capacity(packet.decoded_bytes_len as usize + 8);
+    let mut decoded: Vec<u8> = vec![0; packet.decoded_bytes_len as usize + 8];
     let mut index = 0usize;
     let mut state = 0;
 
@@ -23,41 +23,25 @@ fn decode_message(packet: &Packet, table: &StateTables) -> String {
     // Lookahead is 56bits
     // Consume unbuffered bytes; guaranteed 7 8-bit indices per iteration.
     while bit_reader.unbuffered_bytes_remaining() > 7 {
-        unsafe {
-            bit_reader.refill_lookahead_unchecked();
-            state = step(&mut bit_reader, table, &mut index, &mut decoded, state);
-            state = step(&mut bit_reader, table, &mut index, &mut decoded, state);
-            state = step(&mut bit_reader, table, &mut index, &mut decoded, state);
-            state = step(&mut bit_reader, table, &mut index, &mut decoded, state);
-            state = step(&mut bit_reader, table, &mut index, &mut decoded, state);
-            state = step(&mut bit_reader, table, &mut index, &mut decoded, state);
+        bit_reader.refill_lookahead();
+        for _ in 0..7 {
             state = step(&mut bit_reader, table, &mut index, &mut decoded, state);
         }
     }
 
-    // Drain unbuffered bytes with safe refill.
-    while bit_reader.unbuffered_bytes_remaining() > 0 {
-        bit_reader.refill_lookahead();
-        state = unsafe { step(&mut bit_reader, table, &mut index, &mut decoded, state) };
-    }
-
     // Consume remaining bytes.
+    bit_reader.refill_lookahead();
     while bit_reader.bytes_remaining() > 0 {
-        state = unsafe { step(&mut bit_reader, table, &mut index, &mut decoded, state) };
+        state = step(&mut bit_reader, table, &mut index, &mut decoded, state);
     }
 
     // Truncate decoded slop.
-    unsafe {
-        decoded.set_len(index);
-        let slice = std::slice::from_raw_parts(decoded.as_ptr(), decoded.len());
-        let mut decoded = std::str::from_utf8_unchecked(slice).to_owned();
-        decoded.truncate(packet.decoded_bytes_len as usize);
-        decoded
-    }
+    let slice = &decoded[..packet.decoded_bytes_len as usize];
+    std::str::from_utf8(slice).unwrap().to_owned()
 }
 
 #[inline(always)]
-unsafe fn step(
+fn step(
     bit_reader: &mut BigEndianReader,
     table: &StateTables,
     write_index: &mut usize,
@@ -65,11 +49,7 @@ unsafe fn step(
     state: usize,
 ) -> usize {
     let index = bit_reader.peek(8) as usize;
-    let symbols: &[u8; 9] = table
-        .tables
-        .get_unchecked(state)
-        .symbols
-        .get_unchecked(index);
+    let symbols: &[u8; 9] = &table.tables[state].symbols[index];
     let state = symbols[0] as usize;
     copy_symbols(symbols, write_index, decoded);
     bit_reader.consume(8);
@@ -77,12 +57,11 @@ unsafe fn step(
 }
 
 #[inline(always)]
-unsafe fn copy_symbols(symbols: &[u8; 9], write_index: &mut usize, decoded: &mut [u8]) {
-    decoded
-        .as_mut_ptr()
-        .add(*write_index)
-        .copy_from_nonoverlapping(symbols.as_ptr().add(1), 8);
-    *write_index += symbols[1..].iter().position(|&byte| byte == 0).unwrap_or(8);
+fn copy_symbols(symbols: &[u8; 9], write_index: &mut usize, decoded: &mut [u8]) {
+    decoded[*write_index..*write_index + 8].copy_from_slice(&symbols[1..9]);
+    let symbol_block = u64::from_le_bytes(symbols[1..9].try_into().unwrap());
+    let len = 8 - (symbol_block.leading_zeros() / 8) as usize;
+    *write_index += len;
 }
 
 #[inline(always)]
@@ -105,7 +84,7 @@ fn huffman_tree(packet: &Packet, tree: &mut [TreeNode; MAX_TREE_LEN]) {
     tree[0].right_index = 2;
     tree[0].index = Some(0);
 
-    let mut heap = unsafe { symbols_heap(packet) };
+    let mut heap = symbols_heap(packet);
     let mut tree_index = 2 * packet.symbol_count as usize - 1;
 
     // Successively move two smallest nodes from heap to tree
@@ -132,13 +111,12 @@ fn huffman_tree(packet: &Packet, tree: &mut [TreeNode; MAX_TREE_LEN]) {
     process_heap_node(&left, tree, tree_index);
 }
 
-// #[inline(always)]
-unsafe fn symbols_heap(packet: &Packet) -> MinHeapless<HeapNode> {
+fn symbols_heap(packet: &Packet) -> MinHeapless<HeapNode> {
     let mut heap = MinHeapless::<HeapNode>::new();
-    let ptr = packet.symbol_frequency_bytes.as_ptr();
-    for i in 0..packet.symbol_count as usize {
-        let freq_ptr = ptr.add(i * 8) as *const (u32, u8);
-        let (frequency, symbol) = freq_ptr.read_unaligned();
+    let bytes = &packet.symbol_frequency_bytes;
+    for chunk in bytes.chunks_exact(8) {
+        let frequency = u32::from_le_bytes(chunk[..4].try_into().unwrap());
+        let symbol = chunk[4];
         heap.push(HeapNode::new(Some(symbol), frequency));
     }
     heap
@@ -161,7 +139,6 @@ struct StateTables {
     tables: [SymbolTable; MAX_SYMBOLS],
 }
 
-// #[inline(always)]
 fn state_tables(tree: &[TreeNode; MAX_TREE_LEN]) -> StateTables {
     let (table_indices, child_states) = child_states(tree);
 
@@ -194,7 +171,6 @@ fn state_tables(tree: &[TreeNode; MAX_TREE_LEN]) -> StateTables {
     state_tables
 }
 
-// #[inline(always)]
 fn child_states(tree: &[TreeNode; MAX_TREE_LEN]) -> ([u8; MAX_TREE_LEN], [u8; MAX_TREE_LEN]) {
     let mut table_indices = [MAX_TREE_LEN as u8; MAX_TREE_LEN];
     let mut child_states = [MAX_TREE_LEN as u8; MAX_TREE_LEN];
@@ -235,7 +211,6 @@ fn initialize_reference_table(
     table
 }
 
-// #[inline(always)]
 fn copy_lower_gen_upper(
     start_node: &TreeNode,
     tree: &[TreeNode; MAX_TREE_LEN],
@@ -260,7 +235,6 @@ fn copy_lower_gen_upper(
     table
 }
 
-// #[inline(always)]
 fn gen_lower_copy_upper(
     start_node: &TreeNode,
     tree: &[TreeNode; MAX_TREE_LEN],
@@ -285,7 +259,6 @@ fn gen_lower_copy_upper(
     table
 }
 
-// #[inline(always)]
 fn copy_full_range(
     start_node: &TreeNode,
     tree: &[TreeNode; MAX_TREE_LEN],
@@ -303,7 +276,6 @@ fn copy_full_range(
     table
 }
 
-// #[inline(always)]
 fn gen_full_range(
     start_node: &TreeNode,
     tree: &[TreeNode; MAX_TREE_LEN],
@@ -334,8 +306,8 @@ fn decode_bits<'a>(
     let mut write_index = 1;
     for _ in 0..=7 {
         node = match bits >> 7 {
-            0 => unsafe { tree.get_unchecked(node.left_index as usize) },
-            _ => unsafe { tree.get_unchecked(node.right_index as usize) },
+            0 => &tree[node.left_index as usize],
+            _ => &tree[node.right_index as usize],
         };
         if let Some(symbol) = node.symbol {
             symbols[write_index] = symbol;
@@ -346,7 +318,7 @@ fn decode_bits<'a>(
     symbols[0] = if node.symbol.is_some() {
         0
     } else {
-        unsafe { *table_indices.get_unchecked(node.index.unwrap() as usize) as u8 }
+        table_indices[node.index.unwrap() as usize] as u8
     };
 }
 
@@ -402,35 +374,12 @@ struct TreeNode {
 
 #[cfg(test)]
 mod tests {
-    use common::{packet::Packet, test_cases::*};
+    use common::test_cases::*;
 
     #[test]
     fn decodes_packet() {
         let decoded_message = super::decode_packet(&TEST_BYTES);
         assert_eq!(decoded_message, EXPECTED_MESSAGE);
-    }
-
-    #[test]
-    fn gen_table() {
-        let response_bytes = TEST_BYTES;
-        let packet = &Packet::new(&response_bytes);
-        let mut tree = [super::TreeNode::default(); super::MAX_TREE_LEN];
-        super::huffman_tree(packet, &mut tree);
-        for (i, node) in tree.iter().enumerate() {
-            println!("node {}: {:?}", i, node);
-        }
-        let table = super::state_tables(&tree);
-        for t in table.tables {
-            for i in 0..=255 {
-                println!("{} {:?}", i, t.symbols[i]);
-            }
-            // for i in 123..133 {
-            //     println!("{} {:?}", i, t.symbols[i]);
-            // }
-            // for i in 246..=255 {
-            //     println!("{} {:?}", i, t.symbols[i]);
-            // }
-        }
     }
 }
 

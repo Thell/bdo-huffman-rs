@@ -14,39 +14,37 @@ Clone the repo and run either:
 ## Full Packet Processing Results
 
 The table below highlights how data layout and algorithm choice impacted
-performance.
-
+performance.  
 Times are the average 1,000,000 samples, lower is better.
 
-| Approach     | Safety | Child |   141k   |  70.5k   |  33.3k   |  22.5k   |  11.1k   |   5.5k   |   40b    |
-|--------------|:------:|:-----:|:--------:|:--------:|:--------:|:--------:|:--------:|:--------:|:--------:|
-| **Original** |   ✅    |  Box  |    -     | 398.4 µs | 177.2 µs | 113.0 µs | 53.59 µs | 38.98 µs | 1.375 µs |
-| **BaseLine** |   ✅    |  Box  |    -     | 330.1 µs | 156.7 µs | 99.38 µs | 43.23 µs | 20.35 µs | 474.4 ns |
-|              |        |       |          |          |          |          |          |          |          |
-| **Nested**   |   ✅    |  Box  |    -     | 300.2 µs | 135.2 µs | 78.80 µs | 25.83 µs | 17.03 µs | 508.1 ns |
-| **Flat**     |   ✅    | Index |    -     | 294.9 µs | 132.6 µs | 76.34 µs | 25.31 µs | 17.11 µs | 193.7 ns |
-| **S-Table**  |   ✅    | Index |    -     | 141.8 µs | 64.42 µs | 43.04 µs | 21.37 µs | 10.51 µs | 283.9 ns |
-| **FSM**      |   ✅    | Index | 110.6 µs | 60.54 µs | 34.24 µs | 26.26 µs | 18.65 µs | 16.20 µs | 11.19 µs |
-| **M-Table**  |   ✅    | Index | 114.3 µs | 58.33 µs | 28.02 µs | 19.12 µs | 10.20 µs | 6.585 µs | 1.811 µs |
-|              |        |       |          |          |          |          |          |          |          |
-| **Nested**   |   ❌    |  Box  |    -     | 174.5 µs | 61.66 µs | 26.77 µs | 13.41 µs | 8.117 µs | 451.9 ns |
-| **Flat**     |   ❌    | Const |    -     | 175.2 µs | 60.77 µs | 26.43 µs | 13.08 µs | 7.763 µs | 147.1 ns |
-| **S-Table**  |   ❌    | Const |    -     | 120.6 µs | 54.58 µs | 35.95 µs | 17.87 µs | 8.983 µs | 252.3 µs |
-| **FSM**      |   ❌    | Index | 96.08 µs | 52.88 µs | 30.18 µs | 23.35 µs | 16.81 µs | 14.54 µs | 10.08 µs |
-| **M-Table**  |   ❌    | Const | 101.3 µs | 51.16 µs | 24.29 µs | 16.63 µs | 8.528 µs | 5.293 µs | 937.7 ns |
+| Approach          | Safety | Child |     141k     |    70.5k     |    33.3k     |    22.5k     |    11.1k     |     5.5k     |     40b      |
+|-------------------|:------:|:-----:|:------------:|:------------:|:------------:|:------------:|:------------:|:------------:|:------------:|
+| **Original**      |   ✅    |  Box  |      -       |   398.4 µs   |   177.2 µs   |   113.0 µs   |   53.59 µs   |   38.98 µs   |   1.375 µs   |
+| **BaseLine**      |   ✅    |  Box  |      -       |   332.6 µs   |   156.6 µs   |   102.3 µs   |   44.32 µs   |   22.98 µs   |   507.1 ns   |
+|                   |        |       |              |              |              |              |              |              |              |
+| **Nested**        |   ✅    |  Box  |      -       |   300.3 µs   |   134.1 µs   |   76.92 µs   |   26.74 µs   |   17.40 µs   |   528.3 ns   |
+| **Flat**          |   ✅    | Index |      -       |   296.7 µs   |   133.5 µs   |   76.17 µs   |   25.41 µs   |   16.78 µs   | **192.8** ns |
+| **S-Table**       |   ✅    | Index |      -       |   142.5 µs   |   64.80 µs   |   43.38 µs   |   21.53 µs   |   10.57 µs   |   277.7 ns   |
+| **M-Table**       |   ✅    | Index |   114.0 µs   |   57.90 µs   | **27.85** µs | **19.13** µs | **10.09** µs | **6.643** µs |   1.781 µs   |
+| **FSM**           |   ✅    | Index |   112.7 µs   |   61.35 µs   |   34.67 µs   |   26.30 µs   |   18.64 µs   |   15.73 µs   |   10.87 µs   |
+| **2 Channel FSM** |   ✅    | Index | **93.80** µs | **52.45** µs |   30.52 µs   |   23.80 µs   |   17.77 µs   |   14.69 µs   |   11.23 µs   |
+|                   |        |       |              |              |              |              |              |              |              |
+| **Nested**        |   ❌    |  Box  |      -       |   175.5 µs   |   62.00 µs   |   26.71 µs   |   13.41 µs   |   8.109 µs   |   465.8 ns   |
+| **Flat**          |   ❌    | Const |      -       |   176.2 µs   |   60.25 µs   |   26.44 µs   |   13.11 µs   |   7.755 µs   | **145.0** ns |
+| **S-Table**       |   ❌    | Const |      -       |   128.7 µs   |   57.97 µs   |   38.61 µs   |   19.20 µs   |   9.372 µs   |   258.3 µs   |
+| **M-Table**       |   ❌    | Const |   102.9 µs   |   51.98 µs   |   24.66 µs   | **16.83** µs | **8.573** µs | **5.298** µs |   937.1 ns   |
+| **FSM**           |   ❌    | Index |   97.52 µs   |   53.76 µs   |   30.56 µs   |   23.55 µs   |   16.84 µs   |   14.84 µs   |   10.15 µs   |
+| **2 Channel FSM** |   ❌    | Index | **63.25** µs | **36.68** µs | **22.52** µs |   18.14 µs   |   14.07 µs   |   12.94 µs   |   10.10 µs   |
 
 ✅ Entirely safe code; no unsafe operations anywhere.  
 ❌ Includes unsafe practices like unchecked accesses, raw pointer manipulations, and other explicit unsafe operations.  
+'**Original**' and '**Baseline**' have the same decoding logic, timing changes
+come from the packet parsing and tree building.  
+'**S-Table**'' and '**M-Table**'' use single-symbol and multi-symbol lookup tables.  
 
-\* '**Original**' and '**Baseline**' have the same decoding logic, timing changes
-come from the packet parsing and tree building.
-
-\* '**S-Table**'' and '**M-Table**'' use single-symbol and multi-symbol lookup tables.
-
-\* The timings in the table include all steps to parse and decode the packet.
-All aproaches use the same parser, except the original, which takes less than 3ns for all packets.
-
-\* Tested on a Ryzen 5700G.
+The timings in the table include all steps to parse and decode the packet.  
+All aproaches use the same parser, except the original, which takes less than 3ns for all packets.  
+Tested on a Ryzen 5700G.
 
 ## Decoding Approaches
 
@@ -126,13 +124,6 @@ dramatically improves the time on small messages.
 This approach uses a multi-symbol lookup table built upfront by decoding all
 8-bit paths through the tree.
 
-An observation from analysis of the flat approach is that the upfront cost
-of any prep work for faster decoding has to be amortized quickly when dealing
-with only 75k or less encoded bytes. After several failed experiments with a
-variety of table based, recursive trees, multi-symbol processing methods,
-SIMD, parallel, finite state machines and others I was ready to say it was just
-too small to amortize the setup costs.
-
 Using the flat decoder to decode integers `0..=255` and storing the symbols
 traversed and number of bits used in their own flat array creates a multi-symbol
 lookup table that provides excellent data characteristics for the compiler and
@@ -153,6 +144,38 @@ the cpu.
 - **Iteration:** on both the fully safe and safe except const pointer deref
   versions use the same safe decoding process, the difference is in the tree
   building. The unsafe version uses mut ptr writes and unchecked reads.
+- **Bit buffering:** is fully checked in the safe version and unchecked for all
+  bits except the tail in the unsafe version.
+
+
+### FSM:
+
+This approach uses a multi-table state machine built upfront by decoding all
+8-bit paths through the tree for all internal nodes.
+
+The upfront cost is high for this setup. The flat decoder is used to decode
+a single path from a leaf node's parent through all 8 bit paths which is then
+used to populate all leaf parent state tables, the remainder of the internal
+nodes have their paths decoded and states recorded.
+
+The decoding is done a full byte at a time. In the 2-channel versions the first
+and second halves are processed together and the joined once the first half
+converges with the second.
+
+#### Key Improvements:
+
+- **[Bitter](https://github.com/nickbabcock/bitter):** for
+  [blazing fast bit reading](https://github.com/nickbabcock/bitter#comparison-to-other-libraries).
+- **Multi-symbol finite state machine:** flat lookup table for each 8 step path
+  from `0..=255` for each internal node generated using the `FlatNode` tree.
+- **Loop unrolling:** manually for both bulk ('outer') and compiler unrolled for
+  the per symbol ('inner') loops. With the inner's compiled code exactly
+  matching a manually unrolled and optimized loop.
+
+#### Safety:
+
+- **Iteration:** The unsafe version uses mut ptr writes and unchecked reads and
+  unsafe copy methods where beneficial.
 - **Bit buffering:** is fully checked in the safe version and unchecked for all
   bits except the tail in the unsafe version.
 

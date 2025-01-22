@@ -20,8 +20,10 @@ use table_unsafe_ptr;
 use table_single_index;
 use table_single_unsafe_ptr;
 
-use state_table_index;
-use state_table_unsafe;
+use fsm;
+use fsm_2channel;
+use fsm_unsafe;
+use fsm_unsafe_2channel;
 
 fn main() {
     divan::main();
@@ -74,8 +76,10 @@ fn all_samples_fsm(bencher: divan::Bencher) {
             let packet = common::packet::Packet::new(&content);
             if packet.encoded_bytes_len <= 128 {
                 black_box(flat_unsafe_ptr::decode_packet(&content));
+            } else if packet.encoded_bytes_len >= 40_000 {
+                black_box(fsm_unsafe_2channel::decode_packet(&content));
             } else {
-                black_box(state_table_unsafe::decode_packet(&content));
+                black_box(table_unsafe_ptr::decode_packet(&content));
             }
         }
     });
