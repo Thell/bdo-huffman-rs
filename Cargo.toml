@@ -21,8 +21,13 @@ members = [
     "table_single_unsafe_ptr",
     "fsm",
     "fsm_2channel",
+    "fsm_3channel",
+    "fsm_4channel",
     "fsm_unsafe",
     "fsm_unsafe_2channel",
+    "fsm_unsafe_3channel",
+    "fsm_unsafe_4channel",
+    "fsm_unsafe_5channel",
 
     "profile_bin",
 ]
@@ -51,8 +56,13 @@ table_single_index = { version = "*", path = "table_single_index" }
 table_single_unsafe_ptr = { version = "*", path = "table_single_unsafe_ptr" }
 fsm = { version = "*", path = "fsm" }
 fsm_2channel = { version = "*", path = "fsm_2channel" }
+fsm_3channel = { version = "*", path = "fsm_3channel" }
+fsm_4channel = { version = "*", path = "fsm_4channel" }
 fsm_unsafe = { version = "*", path = "fsm_unsafe" }
 fsm_unsafe_2channel = { version = "*", path = "fsm_unsafe_2channel" }
+fsm_unsafe_3channel = { version = "*", path = "fsm_unsafe_3channel" }
+fsm_unsafe_4channel = { version = "*", path = "fsm_unsafe_4channel" }
+fsm_unsafe_5channel = { version = "*", path = "fsm_unsafe_5channel" }
 
 [[bench]]
 name = "benches"

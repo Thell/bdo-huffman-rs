@@ -15,33 +15,44 @@ pub fn decode_packet(content: &[u8]) -> String {
 fn decode_message(packet: &Packet, table: &StateTables) -> String {
     let mut decoded0: Vec<u8> = Vec::with_capacity(packet.decoded_bytes_len as usize + 8);
     let mut decoded1: Vec<u8> = Vec::with_capacity(packet.decoded_bytes_len as usize + 8);
+    let mut decoded2: Vec<u8> = Vec::with_capacity(packet.decoded_bytes_len as usize + 8);
 
     let mut ptr0 = decoded0.as_mut_ptr();
     let mut ptr1 = decoded1.as_mut_ptr();
+    let mut ptr2 = decoded2.as_mut_ptr();
 
     let mut state0 = 0usize;
     let mut state1 = 0usize;
+    let mut state2 = 0usize;
 
-    let (last_byte, encoded_bytes) = if packet.encoded_bytes_len as usize % 2 == 1 {
-        let (last, rest) = packet.encoded_message.split_last().unwrap();
-        (Some(last), rest)
+    let (tail, encoded_bytes) = if packet.encoded_bytes_len as usize % 3 != 0 {
+        let n = (packet.encoded_bytes_len / 3) * 3;
+        let (encoded_bytes, tail) = packet.encoded_message.split_at(n as usize);
+        (Some(tail), encoded_bytes)
     } else {
         (None, packet.encoded_message)
     };
 
-    let mid = encoded_bytes.len() / 2;
-    let (bytes0, bytes1) = encoded_bytes.split_at(mid);
+    let chunk_len = encoded_bytes.len() / 3;
+    let mut chunk_iter = encoded_bytes.chunks_exact(chunk_len);
+    let bytes0 = chunk_iter.next().unwrap();
+    let bytes1 = chunk_iter.next().unwrap();
+    let bytes2 = chunk_iter.next().unwrap();
+
     let mut bit_reader0 = BigEndianReader::new(bytes0);
     let mut bit_reader1 = BigEndianReader::new(bytes1);
+    let mut bit_reader2 = BigEndianReader::new(bytes2);
 
     unsafe {
         // Lookahead is 56 bits
         while bit_reader0.unbuffered_bytes_remaining() > 7 {
             bit_reader0.refill_lookahead_unchecked();
             bit_reader1.refill_lookahead_unchecked();
+            bit_reader2.refill_lookahead_unchecked();
             for _ in 0..7 {
                 state0 = step(&mut bit_reader0, table, &mut ptr0, state0);
                 state1 = step(&mut bit_reader1, table, &mut ptr1, state1);
+                state2 = step(&mut bit_reader2, table, &mut ptr2, state2);
             }
         }
 
@@ -49,6 +60,7 @@ fn decode_message(packet: &Packet, table: &StateTables) -> String {
         // Drain the unbuferred and no more refills will be needed.
         bit_reader0.refill_lookahead();
         bit_reader1.refill_lookahead();
+        bit_reader2.refill_lookahead();
 
         // Generate 7 unrolled blocks, one for each size reachable via a jump table
         let bytes_remaining = bit_reader0.bytes_remaining();
@@ -56,36 +68,43 @@ fn decode_message(packet: &Packet, table: &StateTables) -> String {
             for _ in 0..bytes_remaining {
                 state0 = step(&mut bit_reader0, table, &mut ptr0, state0);
                 state1 = step(&mut bit_reader1, table, &mut ptr1, state1);
+                state2 = step(&mut bit_reader2, table, &mut ptr2, state2);
             }
         } else if bytes_remaining == 6 {
             for _ in 0..bytes_remaining {
                 state0 = step(&mut bit_reader0, table, &mut ptr0, state0);
                 state1 = step(&mut bit_reader1, table, &mut ptr1, state1);
+                state2 = step(&mut bit_reader2, table, &mut ptr2, state2);
             }
         } else if bytes_remaining == 5 {
             for _ in 0..bytes_remaining {
                 state0 = step(&mut bit_reader0, table, &mut ptr0, state0);
                 state1 = step(&mut bit_reader1, table, &mut ptr1, state1);
+                state2 = step(&mut bit_reader2, table, &mut ptr2, state2);
             }
         } else if bytes_remaining == 4 {
             for _ in 0..bytes_remaining {
                 state0 = step(&mut bit_reader0, table, &mut ptr0, state0);
                 state1 = step(&mut bit_reader1, table, &mut ptr1, state1);
+                state2 = step(&mut bit_reader2, table, &mut ptr2, state2);
             }
         } else if bytes_remaining == 3 {
             for _ in 0..bytes_remaining {
                 state0 = step(&mut bit_reader0, table, &mut ptr0, state0);
                 state1 = step(&mut bit_reader1, table, &mut ptr1, state1);
+                state2 = step(&mut bit_reader2, table, &mut ptr2, state2);
             }
         } else if bytes_remaining == 2 {
             for _ in 0..bytes_remaining {
                 state0 = step(&mut bit_reader0, table, &mut ptr0, state0);
                 state1 = step(&mut bit_reader1, table, &mut ptr1, state1);
+                state2 = step(&mut bit_reader2, table, &mut ptr2, state2);
             }
         } else if bytes_remaining == 1 {
             for _ in 0..bytes_remaining {
                 state0 = step(&mut bit_reader0, table, &mut ptr0, state0);
                 state1 = step(&mut bit_reader1, table, &mut ptr1, state1);
+                state2 = step(&mut bit_reader2, table, &mut ptr2, state2);
             }
         }
 
@@ -99,20 +118,33 @@ fn decode_message(packet: &Packet, table: &StateTables) -> String {
             table,
         );
 
-        if let Some(last_byte) = last_byte {
-            let symbols: &[u8; 9] = table
-                .tables
-                .get_unchecked(state0)
-                .symbols
-                .get_unchecked(*last_byte as usize);
+        state0 = converge(
+            bytes2,
+            state0,
+            state2,
+            &mut ptr0,
+            &mut ptr2,
+            &mut decoded2,
+            table,
+        );
 
-            let src_ptr = symbols.as_ptr().add(1);
-            std::ptr::copy_nonoverlapping(src_ptr, ptr0, 8);
+        if let Some(last_bytes) = tail {
+            for byte in last_bytes {
+                let symbols: &[u8; 9] = table
+                    .tables
+                    .get_unchecked(state0)
+                    .symbols
+                    .get_unchecked(*byte as usize);
 
-            let symbols = symbols.last_chunk::<8>().unwrap();
-            let symbol_block = u64::from_le_bytes(*symbols);
-            let len = 8 - (symbol_block.leading_zeros() / 8) as usize;
-            ptr0 = ptr0.add(len);
+                state0 = symbols[0] as usize;
+                let src_ptr = symbols.as_ptr().add(1);
+                std::ptr::copy_nonoverlapping(src_ptr, ptr0, 8);
+
+                let symbols = symbols.last_chunk::<8>().unwrap();
+                let symbol_block = u64::from_le_bytes(*symbols);
+                let len = 8 - (symbol_block.leading_zeros() / 8) as usize;
+                ptr0 = ptr0.add(len);
+            }
         }
 
         let final_len = ptr0.offset_from(decoded0.as_ptr()) as usize;

@@ -13,205 +13,185 @@ pub fn decode_packet(content: &[u8]) -> String {
 }
 
 fn decode_message(packet: &Packet, table: &StateTables) -> String {
-    let mut decoded0: Vec<u8> = Vec::with_capacity(packet.decoded_bytes_len as usize + 8);
-    let mut decoded1: Vec<u8> = Vec::with_capacity(packet.decoded_bytes_len as usize + 8);
+    // Add slop space instead of checking write_index against decoded_len.
+    let mut decoded0 = vec![0; packet.decoded_bytes_len as usize + 8];
+    let mut decoded1 = vec![0; packet.decoded_bytes_len as usize + 8];
+    let mut decoded2 = vec![0; packet.decoded_bytes_len as usize + 8];
+    let mut decoded3 = vec![0; packet.decoded_bytes_len as usize + 8];
 
-    let mut ptr0 = decoded0.as_mut_ptr();
-    let mut ptr1 = decoded1.as_mut_ptr();
-
+    let mut index0 = 0usize;
+    let mut index1 = 0usize;
+    let mut index2 = 0usize;
+    let mut index3 = 0usize;
     let mut state0 = 0usize;
     let mut state1 = 0usize;
+    let mut state2 = 0usize;
+    let mut state3 = 0usize;
 
-    let (last_byte, encoded_bytes) = if packet.encoded_bytes_len as usize % 2 == 1 {
-        let (last, rest) = packet.encoded_message.split_last().unwrap();
-        (Some(last), rest)
+    let (tail, encoded_bytes) = if packet.encoded_bytes_len as usize % 4 != 0 {
+        let n = (packet.encoded_bytes_len / 4) * 4;
+        let (encoded_bytes, tail) = packet.encoded_message.split_at(n as usize);
+        (Some(tail), encoded_bytes)
     } else {
         (None, packet.encoded_message)
     };
 
-    let mid = encoded_bytes.len() / 2;
-    let (bytes0, bytes1) = encoded_bytes.split_at(mid);
+    let chunk_len = encoded_bytes.len() / 4;
+    let mut chunk_iter = encoded_bytes.chunks_exact(chunk_len);
+    let bytes0 = chunk_iter.next().unwrap();
+    let bytes1 = chunk_iter.next().unwrap();
+    let bytes2 = chunk_iter.next().unwrap();
+    let bytes3 = chunk_iter.next().unwrap();
     let mut bit_reader0 = BigEndianReader::new(bytes0);
     let mut bit_reader1 = BigEndianReader::new(bytes1);
+    let mut bit_reader2 = BigEndianReader::new(bytes2);
+    let mut bit_reader3 = BigEndianReader::new(bytes3);
 
-    unsafe {
-        // Lookahead is 56 bits
-        while bit_reader0.unbuffered_bytes_remaining() > 7 {
-            bit_reader0.refill_lookahead_unchecked();
-            bit_reader1.refill_lookahead_unchecked();
-            for _ in 0..7 {
-                state0 = step(&mut bit_reader0, table, &mut ptr0, state0);
-                state1 = step(&mut bit_reader1, table, &mut ptr1, state1);
-            }
-        }
-
-        // There are between 1 and 7 unbuffered bytes remaining and buffer is empty.
-        // Drain the unbuferred and no more refills will be needed.
+    // Lookahead is 56bits
+    while bit_reader0.unbuffered_bytes_remaining() > 7 {
         bit_reader0.refill_lookahead();
         bit_reader1.refill_lookahead();
-
-        // Generate 7 unrolled blocks, one for each size reachable via a jump table
-        let bytes_remaining = bit_reader0.bytes_remaining();
-        if bytes_remaining == 7 {
-            for _ in 0..bytes_remaining {
-                state0 = step(&mut bit_reader0, table, &mut ptr0, state0);
-                state1 = step(&mut bit_reader1, table, &mut ptr1, state1);
-            }
-        } else if bytes_remaining == 6 {
-            for _ in 0..bytes_remaining {
-                state0 = step(&mut bit_reader0, table, &mut ptr0, state0);
-                state1 = step(&mut bit_reader1, table, &mut ptr1, state1);
-            }
-        } else if bytes_remaining == 5 {
-            for _ in 0..bytes_remaining {
-                state0 = step(&mut bit_reader0, table, &mut ptr0, state0);
-                state1 = step(&mut bit_reader1, table, &mut ptr1, state1);
-            }
-        } else if bytes_remaining == 4 {
-            for _ in 0..bytes_remaining {
-                state0 = step(&mut bit_reader0, table, &mut ptr0, state0);
-                state1 = step(&mut bit_reader1, table, &mut ptr1, state1);
-            }
-        } else if bytes_remaining == 3 {
-            for _ in 0..bytes_remaining {
-                state0 = step(&mut bit_reader0, table, &mut ptr0, state0);
-                state1 = step(&mut bit_reader1, table, &mut ptr1, state1);
-            }
-        } else if bytes_remaining == 2 {
-            for _ in 0..bytes_remaining {
-                state0 = step(&mut bit_reader0, table, &mut ptr0, state0);
-                state1 = step(&mut bit_reader1, table, &mut ptr1, state1);
-            }
-        } else if bytes_remaining == 1 {
-            for _ in 0..bytes_remaining {
-                state0 = step(&mut bit_reader0, table, &mut ptr0, state0);
-                state1 = step(&mut bit_reader1, table, &mut ptr1, state1);
-            }
+        bit_reader2.refill_lookahead();
+        bit_reader3.refill_lookahead();
+        for _ in 0..7 {
+            state0 = step(&mut bit_reader0, table, &mut index0, &mut decoded0, state0);
+            state1 = step(&mut bit_reader1, table, &mut index1, &mut decoded1, state1);
+            state2 = step(&mut bit_reader2, table, &mut index2, &mut decoded2, state2);
+            state3 = step(&mut bit_reader3, table, &mut index3, &mut decoded3, state3);
         }
-
-        state0 = converge(
-            bytes1,
-            state0,
-            state1,
-            &mut ptr0,
-            &mut ptr1,
-            &mut decoded1,
-            table,
-        );
-
-        if let Some(last_byte) = last_byte {
-            let symbols: &[u8; 9] = table
-                .tables
-                .get_unchecked(state0)
-                .symbols
-                .get_unchecked(*last_byte as usize);
-
-            let src_ptr = symbols.as_ptr().add(1);
-            std::ptr::copy_nonoverlapping(src_ptr, ptr0, 8);
-
-            let symbols = symbols.last_chunk::<8>().unwrap();
-            let symbol_block = u64::from_le_bytes(*symbols);
-            let len = 8 - (symbol_block.leading_zeros() / 8) as usize;
-            ptr0 = ptr0.add(len);
-        }
-
-        let final_len = ptr0.offset_from(decoded0.as_ptr()) as usize;
-        decoded0.set_len(final_len);
-
-        let slice = std::slice::from_raw_parts(decoded0.as_ptr(), final_len);
-        let mut decoded = std::str::from_utf8_unchecked(slice).to_owned();
-        decoded.truncate(packet.decoded_bytes_len as usize);
-        decoded
     }
+    bit_reader0.refill_lookahead();
+    bit_reader1.refill_lookahead();
+    bit_reader2.refill_lookahead();
+    bit_reader3.refill_lookahead();
+    while bit_reader0.bytes_remaining() > 0 {
+        state0 = step(&mut bit_reader0, table, &mut index0, &mut decoded0, state0);
+        state1 = step(&mut bit_reader1, table, &mut index1, &mut decoded1, state1);
+        state2 = step(&mut bit_reader2, table, &mut index2, &mut decoded2, state2);
+        state3 = step(&mut bit_reader3, table, &mut index3, &mut decoded3, state3);
+    }
+
+    state0 = converge(
+        bytes1,
+        state0,
+        state1,
+        &mut index0,
+        index1,
+        &mut decoded0,
+        &decoded1,
+        table,
+    );
+
+    state0 = converge(
+        bytes2,
+        state0,
+        state2,
+        &mut index0,
+        index2,
+        &mut decoded0,
+        &decoded2,
+        table,
+    );
+
+    state0 = converge(
+        bytes3,
+        state0,
+        state3,
+        &mut index0,
+        index3,
+        &mut decoded0,
+        &decoded3,
+        table,
+    );
+
+    if let Some(last_bytes) = tail {
+        for &byte in last_bytes {
+            let symbols: &[u8; 9] = &table.tables[state0].symbols[byte as usize];
+            state0 = symbols[0] as usize;
+            copy_symbols(symbols, &mut index0, &mut decoded0);
+        }
+    }
+
+    // Truncate decoded slop.
+    let slice = &decoded0[..packet.decoded_bytes_len as usize];
+    std::str::from_utf8(slice).unwrap().to_owned()
 }
 
-unsafe fn step_state(
+fn step_state(
     bit_reader: &mut BigEndianReader,
     table: &StateTables,
-    write_ptr: &mut *mut u8,
+    index: &mut usize,
+    state: usize,
+) -> usize {
+    let byte = bit_reader.peek(8) as usize;
+    let symbols: &[u8; 9] = &table.tables[state].symbols[byte];
+    let state = symbols[0] as usize;
+    bit_reader.consume(8);
+    let symbol_block = u64::from_le_bytes(symbols[1..9].try_into().unwrap());
+    let len = 8 - (symbol_block.leading_zeros() / 8) as usize;
+    *index += len;
+    state
+}
+
+fn step(
+    bit_reader: &mut BigEndianReader,
+    table: &StateTables,
+    write_index: &mut usize,
+    decoded: &mut [u8],
     state: usize,
 ) -> usize {
     let index = bit_reader.peek(8) as usize;
-    let symbols: &[u8; 9] = table
-        .tables
-        .get_unchecked(state)
-        .symbols
-        .get_unchecked(index);
-
-    let next_state = symbols[0] as usize;
+    let symbols: &[u8; 9] = &table.tables[state].symbols[index];
+    let state = symbols[0] as usize;
+    copy_symbols(symbols, write_index, decoded);
     bit_reader.consume(8);
-
-    let symbols = symbols.last_chunk::<8>().unwrap();
-    let symbol_block = u64::from_le_bytes(*symbols);
-    let len = 8 - (symbol_block.leading_zeros() / 8) as usize;
-    *write_ptr = write_ptr.add(len);
-
-    next_state
-}
-
-unsafe fn step(
-    bit_reader: &mut BigEndianReader,
-    table: &StateTables,
-    write_ptr: &mut *mut u8,
-    state: usize,
-) -> usize {
-    let index = bit_reader.peek(8) as usize;
-    let symbols: &[u8; 9] = table
-        .tables
-        .get_unchecked(state)
-        .symbols
-        .get_unchecked(index);
-
-    let next_state = symbols[0] as usize;
-    bit_reader.consume(8);
-
-    let symbols = symbols.last_chunk::<8>().unwrap();
-    symbols
-        .iter()
-        .enumerate()
-        .for_each(|(i, x)| *write_ptr.add(i) = *x);
-
-    let symbol_block = u64::from_le_bytes(*symbols);
-    let len = 8 - (symbol_block.leading_zeros() / 8) as usize;
-    *write_ptr = write_ptr.add(len);
-
-    next_state
+    state
 }
 
 #[inline(always)]
-unsafe fn converge(
+fn copy_symbols(symbols: &[u8; 9], write_index: &mut usize, decoded: &mut [u8]) {
+    decoded[*write_index..*write_index + 8].copy_from_slice(&symbols[1..9]);
+    let symbol_block = u64::from_le_bytes(symbols[1..9].try_into().unwrap());
+    let len = 8 - (symbol_block.leading_zeros() / 8) as usize;
+    *write_index += len;
+}
+
+#[inline(always)]
+fn converge(
     bytes1: &[u8],
     mut state0: usize,
     mut state1: usize,
-    ptr0: &mut *mut u8,
-    ptr1: &mut *mut u8,
-    decoded1: &mut [u8],
+    mut index0: &mut usize,
+    mut index1: usize,
+    mut decoded0: &mut [u8],
+    decoded1: &[u8],
     table: &StateTables,
 ) -> usize {
     let mut bit_reader0 = BigEndianReader::new(bytes1);
     let mut bit_reader1 = BigEndianReader::new(bytes1);
 
     let prev_state1 = state1;
-    let mut ptr1_reset = decoded1.as_mut_ptr();
+    let prev_state1_index = index1;
     state1 = 0;
+    index1 = 0;
 
     while bit_reader0.unbuffered_bytes_remaining() > 0 && state0 != state1 {
         bit_reader0.refill_lookahead();
         bit_reader1.refill_lookahead();
-        state0 = step(&mut bit_reader0, table, ptr0, state0);
-        state1 = step_state(&mut bit_reader1, table, &mut ptr1_reset, state1);
+        state0 = step(&mut bit_reader0, table, &mut index0, &mut decoded0, state0);
+        state1 = step_state(&mut bit_reader1, table, &mut index1, state1);
     }
     while bit_reader0.bytes_remaining() > 0 && state0 != state1 {
-        state0 = step(&mut bit_reader0, table, ptr0, state0);
-        state1 = step_state(&mut bit_reader1, table, &mut ptr1_reset, state1);
+        state0 = step(&mut bit_reader0, table, &mut index0, &mut decoded0, state0);
+        state1 = step_state(&mut bit_reader1, table, &mut index1, state1);
     }
     if state0 != state1 {
         return state0;
     }
 
-    let remaining_len = ptr1.offset_from(ptr1_reset) as usize;
-    ptr0.copy_from_nonoverlapping(ptr1_reset, remaining_len);
-    *ptr0 = ptr0.add(remaining_len);
+    let copy_len = prev_state1_index - index1;
+    decoded0[*index0..*index0 + copy_len].copy_from_slice(&decoded1[index1..index1 + copy_len]);
+    *index0 += copy_len;
 
     prev_state1
 }
@@ -236,7 +216,7 @@ fn huffman_tree(packet: &Packet, tree: &mut [TreeNode; MAX_TREE_LEN]) {
     tree[0].right_index = 2;
     tree[0].index = Some(0);
 
-    let mut heap = unsafe { symbols_heap(packet) };
+    let mut heap = symbols_heap(packet);
     let mut tree_index = 2 * packet.symbol_count as usize - 1;
 
     // Successively move two smallest nodes from heap to tree
@@ -263,12 +243,12 @@ fn huffman_tree(packet: &Packet, tree: &mut [TreeNode; MAX_TREE_LEN]) {
     process_heap_node(&left, tree, tree_index);
 }
 
-unsafe fn symbols_heap(packet: &Packet) -> MinHeapless<HeapNode> {
+fn symbols_heap(packet: &Packet) -> MinHeapless<HeapNode> {
     let mut heap = MinHeapless::<HeapNode>::new();
-    let ptr = packet.symbol_frequency_bytes.as_ptr();
-    for i in 0..packet.symbol_count as usize {
-        let freq_ptr = ptr.add(i * 8) as *const (u32, u8);
-        let (frequency, symbol) = freq_ptr.read_unaligned();
+    let bytes = &packet.symbol_frequency_bytes;
+    for chunk in bytes.chunks_exact(8) {
+        let frequency = u32::from_le_bytes(chunk[..4].try_into().unwrap());
+        let symbol = chunk[4];
         heap.push(HeapNode::new(Some(symbol), frequency));
     }
     heap
@@ -458,8 +438,8 @@ fn decode_bits<'a>(
     let mut write_index = 1;
     for _ in 0..=7 {
         node = match bits >> 7 {
-            0 => unsafe { tree.get_unchecked(node.left_index as usize) },
-            _ => unsafe { tree.get_unchecked(node.right_index as usize) },
+            0 => &tree[node.left_index as usize],
+            _ => &tree[node.right_index as usize],
         };
         if let Some(symbol) = node.symbol {
             symbols[write_index] = symbol;
@@ -470,7 +450,7 @@ fn decode_bits<'a>(
     symbols[0] = if node.symbol.is_some() {
         0
     } else {
-        unsafe { *table_indices.get_unchecked(node.index.unwrap() as usize) as u8 }
+        table_indices[node.index.unwrap() as usize] as u8
     };
 }
 

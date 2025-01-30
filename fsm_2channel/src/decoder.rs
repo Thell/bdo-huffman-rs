@@ -38,20 +38,10 @@ fn decode_message(packet: &Packet, table: &StateTables) -> String {
     while bit_reader0.unbuffered_bytes_remaining() > 7 {
         bit_reader0.refill_lookahead();
         bit_reader1.refill_lookahead();
-        state0 = step(&mut bit_reader0, table, &mut index0, &mut decoded0, state0);
-        state0 = step(&mut bit_reader0, table, &mut index0, &mut decoded0, state0);
-        state0 = step(&mut bit_reader0, table, &mut index0, &mut decoded0, state0);
-        state0 = step(&mut bit_reader0, table, &mut index0, &mut decoded0, state0);
-        state0 = step(&mut bit_reader0, table, &mut index0, &mut decoded0, state0);
-        state0 = step(&mut bit_reader0, table, &mut index0, &mut decoded0, state0);
-        state0 = step(&mut bit_reader0, table, &mut index0, &mut decoded0, state0);
-        state1 = step(&mut bit_reader1, table, &mut index1, &mut decoded1, state1);
-        state1 = step(&mut bit_reader1, table, &mut index1, &mut decoded1, state1);
-        state1 = step(&mut bit_reader1, table, &mut index1, &mut decoded1, state1);
-        state1 = step(&mut bit_reader1, table, &mut index1, &mut decoded1, state1);
-        state1 = step(&mut bit_reader1, table, &mut index1, &mut decoded1, state1);
-        state1 = step(&mut bit_reader1, table, &mut index1, &mut decoded1, state1);
-        state1 = step(&mut bit_reader1, table, &mut index1, &mut decoded1, state1);
+        for _ in 0..7 {
+            state0 = step(&mut bit_reader0, table, &mut index0, &mut decoded0, state0);
+            state1 = step(&mut bit_reader1, table, &mut index1, &mut decoded1, state1);
+        }
     }
     bit_reader0.refill_lookahead();
     bit_reader1.refill_lookahead();
@@ -60,37 +50,16 @@ fn decode_message(packet: &Packet, table: &StateTables) -> String {
         state1 = step(&mut bit_reader1, table, &mut index1, &mut decoded1, state1);
     }
 
-    if state0 == 0 {
-        let new_len = index0 + index1;
-        decoded0[index0..new_len].copy_from_slice(&decoded1[..index1]);
-        state0 = state1;
-        index0 = new_len;
-    } else {
-        // Process [mid..] until convergence.
-        let prev_state1 = state1;
-        let prev_state1_index = index1;
-        state1 = 0;
-        index1 = 0;
-
-        let mut bit_reader0 = BigEndianReader::new(bytes1);
-        let mut bit_reader1 = BigEndianReader::new(bytes1);
-
-        while bit_reader0.unbuffered_bytes_remaining() > 0 && state0 != state1 {
-            bit_reader0.refill_lookahead();
-            bit_reader1.refill_lookahead();
-            state0 = step(&mut bit_reader0, table, &mut index0, &mut decoded0, state0);
-            state1 = step_state(&mut bit_reader1, table, &mut index1, state1);
-        }
-        while bit_reader0.bytes_remaining() > 0 && state0 != state1 {
-            state0 = step(&mut bit_reader0, table, &mut index0, &mut decoded0, state0);
-            state1 = step_state(&mut bit_reader1, table, &mut index1, state1);
-        }
-
-        let copy_len = prev_state1_index - index1;
-        decoded0[index0..index0 + copy_len].copy_from_slice(&decoded1[index1..index1 + copy_len]);
-        index0 += copy_len;
-        state0 = prev_state1;
-    }
+    state0 = converge(
+        bytes1,
+        state0,
+        state1,
+        &mut index0,
+        index1,
+        &mut decoded0,
+        &decoded1,
+        table,
+    );
 
     if let Some(last_byte) = last_byte {
         let symbols: &[u8; 9] = &table.tables[state0].symbols[*last_byte as usize];
@@ -139,6 +108,46 @@ fn copy_symbols(symbols: &[u8; 9], write_index: &mut usize, decoded: &mut [u8]) 
     let symbol_block = u64::from_le_bytes(symbols[1..9].try_into().unwrap());
     let len = 8 - (symbol_block.leading_zeros() / 8) as usize;
     *write_index += len;
+}
+
+#[inline(always)]
+fn converge(
+    bytes1: &[u8],
+    mut state0: usize,
+    mut state1: usize,
+    mut index0: &mut usize,
+    mut index1: usize,
+    mut decoded0: &mut [u8],
+    decoded1: &[u8],
+    table: &StateTables,
+) -> usize {
+    let mut bit_reader0 = BigEndianReader::new(bytes1);
+    let mut bit_reader1 = BigEndianReader::new(bytes1);
+
+    let prev_state1 = state1;
+    let prev_state1_index = index1;
+    state1 = 0;
+    index1 = 0;
+
+    while bit_reader0.unbuffered_bytes_remaining() > 0 && state0 != state1 {
+        bit_reader0.refill_lookahead();
+        bit_reader1.refill_lookahead();
+        state0 = step(&mut bit_reader0, table, &mut index0, &mut decoded0, state0);
+        state1 = step_state(&mut bit_reader1, table, &mut index1, state1);
+    }
+    while bit_reader0.bytes_remaining() > 0 && state0 != state1 {
+        state0 = step(&mut bit_reader0, table, &mut index0, &mut decoded0, state0);
+        state1 = step_state(&mut bit_reader1, table, &mut index1, state1);
+    }
+    if state0 != state1 {
+        return state0;
+    }
+
+    let copy_len = prev_state1_index - index1;
+    decoded0[*index0..*index0 + copy_len].copy_from_slice(&decoded1[index1..index1 + copy_len]);
+    *index0 += copy_len;
+
+    prev_state1
 }
 
 #[inline(always)]

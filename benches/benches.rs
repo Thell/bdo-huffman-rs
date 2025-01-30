@@ -22,8 +22,13 @@ use table_single_unsafe_ptr;
 
 use fsm;
 use fsm_2channel;
+use fsm_3channel;
+use fsm_4channel;
 use fsm_unsafe;
 use fsm_unsafe_2channel;
+use fsm_unsafe_3channel;
+use fsm_unsafe_4channel;
+use fsm_unsafe_5channel;
 
 fn main() {
     divan::main();
@@ -47,7 +52,7 @@ fn all_samples_mtable(bencher: divan::Bencher) {
     bencher.bench_local(move || {
         for content in samples.iter() {
             let packet = common::packet::Packet::new(&content);
-            if packet.encoded_bytes_len <= 128 {
+            if packet.decoded_bytes_len <= 300 {
                 black_box(flat_unsafe_ptr::decode_packet(&content));
             } else {
                 black_box(table_unsafe_ptr::decode_packet(&content));
@@ -69,15 +74,13 @@ fn all_samples_fsm(bencher: divan::Bencher) {
         encoded_len += packet.encoded_bytes_len;
         decoded_len += packet.decoded_bytes_len;
     }
-    println!("\ntotal encoded_len: {}", encoded_len);
-    println!("total decoded_len: {}", decoded_len);
     bencher.bench_local(move || {
         for content in samples.iter() {
             let packet = common::packet::Packet::new(&content);
-            if packet.encoded_bytes_len <= 128 {
+            if packet.decoded_bytes_len <= 300 {
                 black_box(flat_unsafe_ptr::decode_packet(&content));
-            } else if packet.encoded_bytes_len >= 40_000 {
-                black_box(fsm_unsafe_2channel::decode_packet(&content));
+            } else if packet.decoded_bytes_len >= 10_000 {
+                black_box(fsm_unsafe_4channel::decode_packet(&content));
             } else {
                 black_box(table_unsafe_ptr::decode_packet(&content));
             }

@@ -29,8 +29,13 @@ dependencies = [
  "flat_unsafe_ptr",
  "fsm",
  "fsm_2channel",
+ "fsm_3channel",
+ "fsm_4channel",
  "fsm_unsafe",
  "fsm_unsafe_2channel",
+ "fsm_unsafe_3channel",
+ "fsm_unsafe_4channel",
+ "fsm_unsafe_5channel",
  "nested_box",
  "nested_unsafe_box",
  "paste",
@@ -202,6 +207,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "fsm_3channel"
+version = "0.1.0"
+dependencies = [
+ "bitter",
+ "common",
+ "divan",
+]
+
+[[package]]
+name = "fsm_4channel"
+version = "0.1.0"
+dependencies = [
+ "bitter",
+ "common",
+ "divan",
+]
+
+[[package]]
 name = "fsm_unsafe"
 version = "0.1.0"
 dependencies = [
@@ -212,6 +235,35 @@ dependencies = [
 
 [[package]]
 name = "fsm_unsafe_2channel"
+version = "0.1.0"
+dependencies = [
+ "bitter",
+ "common",
+ "divan",
+]
+
+[[package]]
+name = "fsm_unsafe_3channel"
+version = "0.1.0"
+dependencies = [
+ "baseline",
+ "bitter",
+ "common",
+ "divan",
+]
+
+[[package]]
+name = "fsm_unsafe_4channel"
+version = "0.1.0"
+dependencies = [
+ "baseline",
+ "bitter",
+ "common",
+ "divan",
+]
+
+[[package]]
+name = "fsm_unsafe_5channel"
 version = "0.1.0"
 dependencies = [
  "bitter",
