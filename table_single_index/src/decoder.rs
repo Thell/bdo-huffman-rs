@@ -68,7 +68,7 @@ fn decode_message(packet: &Packet, peek_count: u32, table: &[(u8, u8)]) -> Strin
         let last_bits = bit_reader.peek(lookahead_count);
         let index = (last_bits << (peek_count - lookahead_count)) as usize;
 
-        let (bits_used, symbol) = table[index as usize];
+        let (bits_used, symbol) = table[index];
         bit_reader.consume(bits_used as u32);
         decoded[write_index] = symbol;
         write_index += 1;
@@ -232,8 +232,8 @@ mod tests {
     #[test]
     fn gen_table() {
         for case in ALL_CASES {
-            let response_bytes = case.request();
-            let packet = &Packet::new(&response_bytes);
+            let content = case.request();
+            let packet = &Packet::new(&content);
             let mut tree = [super::HeapNode::default(); super::MAX_TREE_LEN];
             super::huffman_tree(packet, &mut tree);
             let _ = super::symbol_table(&tree);
@@ -254,8 +254,8 @@ mod bench {
 
     #[divan::bench(sample_count = 100_000, args = [ALL_CASES[0], ALL_CASES[5]])]
     fn gen_tree(bencher: Bencher, case: &Case) {
-        let response_bytes = case.request();
-        let packet = &Packet::new(&response_bytes);
+        let content = case.request();
+        let packet = &Packet::new(&content);
         bencher.bench_local(move || {
             let mut tree = [HeapNode::default(); MAX_TREE_LEN];
             huffman_tree(packet, &mut tree);
@@ -265,8 +265,8 @@ mod bench {
 
     #[divan::bench(sample_count = 1_000_000, args = [ALL_CASES[0], ALL_CASES[5]])]
     fn gen_table(bencher: Bencher, case: &Case) {
-        let response_bytes = case.request();
-        let packet = &Packet::new(&response_bytes);
+        let content = case.request();
+        let packet = &Packet::new(&content);
         bencher.bench_local(move || {
             let mut tree = [HeapNode::default(); MAX_TREE_LEN];
             huffman_tree(packet, &mut tree);
@@ -276,15 +276,15 @@ mod bench {
 
     #[divan::bench(args = ALL_CASES)]
     fn decode_message(bencher: Bencher, case: &Case) {
-        let response_bytes = case.request();
-        let packet = &Packet::new(&response_bytes);
+        let content = case.request();
+        let packet = &Packet::new(&content);
         let mut tree = [HeapNode::default(); MAX_TREE_LEN];
         huffman_tree(packet, &mut tree);
         let (max_depth, table) = symbol_table(&tree);
         bencher
             .counter(BytesCount::from(packet.decoded_bytes_len))
             .bench_local(move || {
-                super::decode_message(black_box(&packet), max_depth as u32, &table);
+                super::decode_message(black_box(packet), max_depth as u32, &table);
             });
     }
 

@@ -61,8 +61,8 @@ fn process_heap_node(node: &HeapNode, tree: &mut [TreeNode; MAX_TREE_LEN], index
     if node.symbol.is_some() {
         tree[index].symbol = node.symbol;
     } else {
-        tree[index].left_index = node.tree_index as u8;
-        tree[index].right_index = node.tree_index as u8 + 1;
+        tree[index].left_index = node.tree_index;
+        tree[index].right_index = node.tree_index + 1;
     }
 }
 
@@ -151,21 +151,11 @@ impl HeapNode {
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Default)]
 struct TreeNode {
     left_index: u8,
     right_index: u8,
     symbol: Option<u8>,
-}
-
-impl Default for TreeNode {
-    fn default() -> Self {
-        Self {
-            left_index: 0,
-            right_index: 0,
-            symbol: None,
-        }
-    }
 }
 
 // =========================================================
@@ -194,14 +184,14 @@ mod bench {
 
     #[divan::bench(args = ALL_CASES)]
     fn decode_message(bencher: Bencher, case: &Case) {
-        let response_bytes = case.request();
-        let packet = &Packet::new(&response_bytes);
+        let content = case.request();
+        let packet = &Packet::new(&content);
         let mut tree = [TreeNode::default(); MAX_TREE_LEN];
         huffman_tree(packet, &mut tree);
         bencher
             .counter(BytesCount::from(packet.decoded_bytes_len))
             .bench_local(move || {
-                super::decode_message(black_box(&packet), &tree);
+                super::decode_message(black_box(packet), &tree);
             });
     }
 

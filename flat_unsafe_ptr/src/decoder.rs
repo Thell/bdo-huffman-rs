@@ -51,6 +51,7 @@ unsafe fn decode_message(packet: &Packet, tree: &[TreeNode; MAX_TREE_LEN]) -> St
     std::str::from_utf8_unchecked(slice).to_owned()
 }
 
+#[allow(clippy::unnecessary_cast)]
 #[inline(always)]
 unsafe fn step(direction: usize, node: &TreeNode) -> &TreeNode {
     (*(&node.left_ptr as *const _ as *const *const TreeNode)
@@ -205,8 +206,8 @@ mod bench {
 
     #[divan::bench(sample_count = 100_000, args = [ALL_CASES[0], ALL_CASES[5]])]
     fn gen_tree(bencher: Bencher, case: &Case) {
-        let response_bytes = case.request();
-        let packet = &Packet::new(&response_bytes);
+        let content = case.request();
+        let packet = &Packet::new(&content);
         bencher.bench_local(move || {
             let mut tree = [TreeNode::default(); MAX_TREE_LEN];
             huffman_tree(packet, &mut tree);
@@ -216,14 +217,14 @@ mod bench {
 
     #[divan::bench(args = ALL_CASES)]
     fn decode_message(bencher: Bencher, case: &Case) {
-        let response_bytes = case.request();
-        let packet = &Packet::new(&response_bytes);
+        let content = case.request();
+        let packet = &Packet::new(&content);
         let mut tree = [TreeNode::default(); MAX_TREE_LEN];
         huffman_tree(packet, &mut tree);
         bencher
             .counter(BytesCount::from(packet.decoded_bytes_len))
             .bench_local(move || {
-                unsafe { super::decode_message(black_box(&packet), &tree) };
+                unsafe { super::decode_message(black_box(packet), &tree) };
             });
     }
 

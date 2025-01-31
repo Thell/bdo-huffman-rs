@@ -141,9 +141,9 @@ fn converge(
     bytes1: &[u8],
     mut state0: usize,
     mut state1: usize,
-    mut index0: &mut usize,
+    index0: &mut usize,
     mut index1: usize,
-    mut decoded0: &mut [u8],
+    decoded0: &mut [u8],
     decoded1: &[u8],
     table: &StateTables,
 ) -> usize {
@@ -158,11 +158,11 @@ fn converge(
     while bit_reader0.unbuffered_bytes_remaining() > 0 && state0 != state1 {
         bit_reader0.refill_lookahead();
         bit_reader1.refill_lookahead();
-        state0 = step(&mut bit_reader0, table, &mut index0, &mut decoded0, state0);
+        state0 = step(&mut bit_reader0, table, index0, decoded0, state0);
         state1 = step_state(&mut bit_reader1, table, &mut index1, state1);
     }
     while bit_reader0.bytes_remaining() > 0 && state0 != state1 {
-        state0 = step(&mut bit_reader0, table, &mut index0, &mut decoded0, state0);
+        state0 = step(&mut bit_reader0, table, index0, decoded0, state0);
         state1 = step_state(&mut bit_reader1, table, &mut index1, state1);
     }
     if state0 != state1 {
@@ -259,7 +259,7 @@ fn state_tables(tree: &[TreeNode; MAX_TREE_LEN]) -> StateTables {
     };
 
     // Find the last 'state 3' node and populate a symbol table to copy entries from later.
-    let reference_index = child_states.iter().rposition(|&x| x == 3).unwrap() as usize;
+    let reference_index = child_states.iter().rposition(|&x| x == 3).unwrap();
     let reference = initialize_reference_table(&tree[reference_index], tree, &table_indices);
     state_tables.tables[table_indices[reference_index] as usize] = reference;
 
@@ -377,8 +377,9 @@ fn copy_full_range(
     _table_indices: &[u8; MAX_TREE_LEN],
     reference_table: &SymbolTable,
 ) -> SymbolTable {
-    let mut table = SymbolTable::default();
-    table.symbols = reference_table.symbols;
+    let mut table = SymbolTable {
+        symbols: reference_table.symbols,
+    };
     table.symbols[0..=127]
         .iter_mut()
         .for_each(|x| x[1] = tree[start_node.left_index as usize].symbol.unwrap());
@@ -430,7 +431,7 @@ fn decode_bits<'a>(
     symbols[0] = if node.symbol.is_some() {
         0
     } else {
-        table_indices[node.index.unwrap() as usize] as u8
+        table_indices[node.index.unwrap()]
     };
 }
 
@@ -508,8 +509,8 @@ mod bench {
 
     #[divan::bench(sample_count = 100_000, args = [ALL_CASES[0], ALL_CASES[5]])]
     fn gen_tree(bencher: Bencher, case: &Case) {
-        let response_bytes = case.request();
-        let packet = &Packet::new(&response_bytes);
+        let content = case.request();
+        let packet = &Packet::new(&content);
         bencher.bench_local(move || {
             let mut tree = [TreeNode::default(); MAX_TREE_LEN];
             huffman_tree(packet, &mut tree);
@@ -519,8 +520,8 @@ mod bench {
 
     #[divan::bench(sample_count = 100_000, args = [ALL_CASES[0], ALL_CASES[5]])]
     fn gen_table(bencher: Bencher, case: &Case) {
-        let response_bytes = case.request();
-        let packet = &Packet::new(&response_bytes);
+        let content = case.request();
+        let packet = &Packet::new(&content);
         bencher.bench_local(move || {
             let mut tree = [TreeNode::default(); MAX_TREE_LEN];
             huffman_tree(packet, &mut tree);
@@ -531,15 +532,15 @@ mod bench {
 
     #[divan::bench(args = ALL_CASES)]
     fn decode_message(bencher: Bencher, case: &Case) {
-        let response_bytes = case.request();
-        let packet = &Packet::new(&response_bytes);
+        let content = case.request();
+        let packet = &Packet::new(&content);
         let mut tree = [TreeNode::default(); MAX_TREE_LEN];
         huffman_tree(packet, &mut tree);
         let table = state_tables(&tree);
         bencher
             .counter(BytesCount::from(packet.decoded_bytes_len))
             .bench_local(move || {
-                super::decode_message(black_box(&packet), &table);
+                super::decode_message(black_box(packet), &table);
             });
     }
 
@@ -563,7 +564,7 @@ mod bench {
             .counter(BytesCount::from(2 * packet.decoded_bytes_len))
             .bench_local(move || {
                 black_box(super::decode_packet(black_box(&content2)));
-                black_box(super::decode_message(black_box(&packet), &table));
+                black_box(super::decode_message(black_box(packet), &table));
             });
     }
 }

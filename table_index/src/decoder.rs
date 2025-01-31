@@ -96,16 +96,10 @@ fn lookup_bits(
 }
 
 fn copy_symbols(symbols: &[u8], write_index: &mut usize, decoded: &mut [u8]) {
-    decoded[*write_index] = symbols[0];
-    *write_index += 1;
-    for i in 1..6 {
-        if symbols[i] > 0 {
-            decoded[*write_index] = symbols[i];
-            *write_index += 1;
-        } else {
-            break;
-        }
-    }
+    symbols.iter().take_while(|&s| *s != 0).for_each(|&s| {
+        decoded[*write_index] = s;
+        *write_index += 1;
+    });
 }
 
 fn huffman_tree(packet: &Packet, tree: &mut [HeapNode; MAX_TREE_LEN]) {
@@ -262,8 +256,8 @@ mod tests {
 
     #[test]
     fn gen_table() {
-        let response_bytes = TEST_BYTES;
-        let packet = &Packet::new(&response_bytes);
+        let content = TEST_BYTES;
+        let packet = &Packet::new(&content);
         let mut tree = [super::HeapNode::default(); super::MAX_TREE_LEN];
         super::huffman_tree(packet, &mut tree);
         let table = super::symbols_table(&tree);
@@ -286,8 +280,8 @@ mod bench {
 
     #[divan::bench(sample_count = 100_000, args = [ALL_CASES[0], ALL_CASES[5]])]
     fn gen_tree(bencher: Bencher, case: &Case) {
-        let response_bytes = case.request();
-        let packet = &Packet::new(&response_bytes);
+        let content = case.request();
+        let packet = &Packet::new(&content);
         bencher.bench_local(move || {
             let mut tree = [HeapNode::default(); MAX_TREE_LEN];
             huffman_tree(packet, &mut tree);
@@ -297,8 +291,8 @@ mod bench {
 
     #[divan::bench(sample_count = 100_000, args = [ALL_CASES[0], ALL_CASES[5]])]
     fn gen_table(bencher: Bencher, case: &Case) {
-        let response_bytes = case.request();
-        let packet = &Packet::new(&response_bytes);
+        let content = case.request();
+        let packet = &Packet::new(&content);
         bencher.bench_local(move || {
             let mut tree = [HeapNode::default(); MAX_TREE_LEN];
             huffman_tree(packet, &mut tree);
@@ -309,15 +303,15 @@ mod bench {
 
     #[divan::bench(args = ALL_CASES)]
     fn decode_message(bencher: Bencher, case: &Case) {
-        let response_bytes = case.request();
-        let packet = &Packet::new(&response_bytes);
+        let content = case.request();
+        let packet = &Packet::new(&content);
         let mut tree = [HeapNode::default(); MAX_TREE_LEN];
         huffman_tree(packet, &mut tree);
         let table = symbols_table(&tree);
         bencher
             .counter(BytesCount::from(packet.decoded_bytes_len))
             .bench_local(move || {
-                super::decode_message(black_box(&packet), &table);
+                super::decode_message(black_box(packet), &table);
             });
     }
 
@@ -341,7 +335,7 @@ mod bench {
             .counter(BytesCount::from(2 * packet.decoded_bytes_len))
             .bench_local(move || {
                 black_box(super::decode_packet(black_box(&content2)));
-                black_box(super::decode_message(black_box(&packet), &table));
+                black_box(super::decode_message(black_box(packet), &table));
             });
     }
 }

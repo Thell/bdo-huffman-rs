@@ -92,10 +92,10 @@ mod benches {
 
     #[divan::bench(args = [ALL_CASES[0], ALL_CASES[5]])]
     fn packet_from_content(bencher: Bencher, case: &Case) {
-        let response_bytes = &case.request();
+        let content = &case.request();
 
         bencher.bench_local(move || {
-            black_box(Packet::new(response_bytes));
+            black_box(Packet::new(content));
         });
     }
 }

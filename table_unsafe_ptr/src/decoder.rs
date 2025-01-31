@@ -302,8 +302,8 @@ mod bench {
 
     #[divan::bench(sample_count = 100_000, args = [ALL_CASES[0], ALL_CASES[5]])]
     fn gen_tree(bencher: Bencher, case: &Case) {
-        let response_bytes = case.request();
-        let packet = &Packet::new(&response_bytes);
+        let content = case.request();
+        let packet = &Packet::new(&content);
         bencher.bench_local(move || {
             let mut tree = [TreeNode::default(); MAX_TREE_LEN];
             huffman_tree(packet, &mut tree);
@@ -313,8 +313,8 @@ mod bench {
 
     #[divan::bench(sample_count = 1_000_000, args = [ALL_CASES[0], ALL_CASES[5]])]
     fn gen_table(bencher: Bencher, case: &Case) {
-        let response_bytes = case.request();
-        let packet = &Packet::new(&response_bytes);
+        let content = case.request();
+        let packet = &Packet::new(&content);
         bencher.bench_local(move || {
             let mut tree = [TreeNode::default(); MAX_TREE_LEN];
             huffman_tree(packet, &mut tree);
@@ -325,15 +325,15 @@ mod bench {
 
     #[divan::bench(args = ALL_CASES)]
     fn decode_message(bencher: Bencher, case: &Case) {
-        let response_bytes = case.request();
-        let packet = &Packet::new(&response_bytes);
+        let content = case.request();
+        let packet = &Packet::new(&content);
         let mut tree = [TreeNode::default(); MAX_TREE_LEN];
         huffman_tree(packet, &mut tree);
         let table = symbols_table(&tree);
         bencher
             .counter(BytesCount::from(packet.decoded_bytes_len))
             .bench_local(move || {
-                super::decode_message(black_box(&packet), &table);
+                super::decode_message(black_box(packet), &table);
             });
     }
 
@@ -357,7 +357,7 @@ mod bench {
             .counter(BytesCount::from(2 * packet.decoded_bytes_len))
             .bench_local(move || {
                 black_box(super::decode_packet(black_box(&content2)));
-                black_box(super::decode_message(black_box(&packet), &table));
+                black_box(super::decode_message(black_box(packet), &table));
             });
     }
 }

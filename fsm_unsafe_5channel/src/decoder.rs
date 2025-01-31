@@ -81,7 +81,7 @@ fn decode_message(packet: &Packet, table: &StateTables) -> String {
         // Generate 7 unrolled blocks, one for each size reachable via a jump table
         let bytes_remaining = bit_reader0.bytes_remaining();
         if bytes_remaining == 7 {
-            for _ in 0..bytes_remaining {
+            for _ in 0..7 {
                 state0 = step(&mut bit_reader0, table, &mut ptr0, state0);
                 state1 = step(&mut bit_reader1, table, &mut ptr1, state1);
                 state2 = step(&mut bit_reader2, table, &mut ptr2, state2);
@@ -89,7 +89,7 @@ fn decode_message(packet: &Packet, table: &StateTables) -> String {
                 state4 = step(&mut bit_reader4, table, &mut ptr4, state4);
             }
         } else if bytes_remaining == 6 {
-            for _ in 0..bytes_remaining {
+            for _ in 0..6 {
                 state0 = step(&mut bit_reader0, table, &mut ptr0, state0);
                 state1 = step(&mut bit_reader1, table, &mut ptr1, state1);
                 state2 = step(&mut bit_reader2, table, &mut ptr2, state2);
@@ -97,7 +97,7 @@ fn decode_message(packet: &Packet, table: &StateTables) -> String {
                 state4 = step(&mut bit_reader4, table, &mut ptr4, state4);
             }
         } else if bytes_remaining == 5 {
-            for _ in 0..bytes_remaining {
+            for _ in 0..5 {
                 state0 = step(&mut bit_reader0, table, &mut ptr0, state0);
                 state1 = step(&mut bit_reader1, table, &mut ptr1, state1);
                 state2 = step(&mut bit_reader2, table, &mut ptr2, state2);
@@ -105,7 +105,7 @@ fn decode_message(packet: &Packet, table: &StateTables) -> String {
                 state4 = step(&mut bit_reader4, table, &mut ptr4, state4);
             }
         } else if bytes_remaining == 4 {
-            for _ in 0..bytes_remaining {
+            for _ in 0..4 {
                 state0 = step(&mut bit_reader0, table, &mut ptr0, state0);
                 state1 = step(&mut bit_reader1, table, &mut ptr1, state1);
                 state2 = step(&mut bit_reader2, table, &mut ptr2, state2);
@@ -113,7 +113,7 @@ fn decode_message(packet: &Packet, table: &StateTables) -> String {
                 state4 = step(&mut bit_reader4, table, &mut ptr4, state4);
             }
         } else if bytes_remaining == 3 {
-            for _ in 0..bytes_remaining {
+            for _ in 0..3 {
                 state0 = step(&mut bit_reader0, table, &mut ptr0, state0);
                 state1 = step(&mut bit_reader1, table, &mut ptr1, state1);
                 state2 = step(&mut bit_reader2, table, &mut ptr2, state2);
@@ -121,7 +121,7 @@ fn decode_message(packet: &Packet, table: &StateTables) -> String {
                 state4 = step(&mut bit_reader4, table, &mut ptr4, state4);
             }
         } else if bytes_remaining == 2 {
-            for _ in 0..bytes_remaining {
+            for _ in 0..2 {
                 state0 = step(&mut bit_reader0, table, &mut ptr0, state0);
                 state1 = step(&mut bit_reader1, table, &mut ptr1, state1);
                 state2 = step(&mut bit_reader2, table, &mut ptr2, state2);
@@ -129,13 +129,11 @@ fn decode_message(packet: &Packet, table: &StateTables) -> String {
                 state4 = step(&mut bit_reader4, table, &mut ptr4, state4);
             }
         } else if bytes_remaining == 1 {
-            for _ in 0..bytes_remaining {
-                state0 = step(&mut bit_reader0, table, &mut ptr0, state0);
-                state1 = step(&mut bit_reader1, table, &mut ptr1, state1);
-                state2 = step(&mut bit_reader2, table, &mut ptr2, state2);
-                state3 = step(&mut bit_reader3, table, &mut ptr3, state3);
-                state4 = step(&mut bit_reader4, table, &mut ptr4, state4);
-            }
+            state0 = step(&mut bit_reader0, table, &mut ptr0, state0);
+            state1 = step(&mut bit_reader1, table, &mut ptr1, state1);
+            state2 = step(&mut bit_reader2, table, &mut ptr2, state2);
+            state3 = step(&mut bit_reader3, table, &mut ptr3, state3);
+            state4 = step(&mut bit_reader4, table, &mut ptr4, state4);
         }
 
         state0 = converge(
@@ -381,7 +379,7 @@ fn state_tables(tree: &[TreeNode; MAX_TREE_LEN]) -> StateTables {
     };
 
     // Find the last 'state 3' node and populate a symbol table to copy entries from later.
-    let reference_index = child_states.iter().rposition(|&x| x == 3).unwrap() as usize;
+    let reference_index = child_states.iter().rposition(|&x| x == 3).unwrap();
     let reference = initialize_reference_table(&tree[reference_index], tree, &table_indices);
     state_tables.tables[table_indices[reference_index] as usize] = reference;
 
@@ -499,8 +497,9 @@ fn copy_full_range(
     _table_indices: &[u8; MAX_TREE_LEN],
     reference_table: &SymbolTable,
 ) -> SymbolTable {
-    let mut table = SymbolTable::default();
-    table.symbols = reference_table.symbols;
+    let mut table = SymbolTable {
+        symbols: reference_table.symbols,
+    };
     table.symbols[0..=127]
         .iter_mut()
         .for_each(|x| x[1] = tree[start_node.left_index as usize].symbol.unwrap());
@@ -552,7 +551,7 @@ fn decode_bits<'a>(
     symbols[0] = if node.symbol.is_some() {
         0
     } else {
-        unsafe { *table_indices.get_unchecked(node.index.unwrap() as usize) as u8 }
+        unsafe { *table_indices.get_unchecked(node.index.unwrap()) }
     };
 }
 
@@ -630,8 +629,8 @@ mod bench {
 
     #[divan::bench(sample_count = 100_000, args = [ALL_CASES[0], ALL_CASES[5]])]
     fn gen_tree(bencher: Bencher, case: &Case) {
-        let response_bytes = case.request();
-        let packet = &Packet::new(&response_bytes);
+        let content = case.request();
+        let packet = &Packet::new(&content);
         bencher.bench_local(move || {
             let mut tree = [TreeNode::default(); MAX_TREE_LEN];
             huffman_tree(packet, &mut tree);
@@ -641,8 +640,8 @@ mod bench {
 
     #[divan::bench(sample_count = 100_000, args = [ALL_CASES[0], ALL_CASES[5]])]
     fn gen_table(bencher: Bencher, case: &Case) {
-        let response_bytes = case.request();
-        let packet = &Packet::new(&response_bytes);
+        let content = case.request();
+        let packet = &Packet::new(&content);
         bencher.bench_local(move || {
             let mut tree = [TreeNode::default(); MAX_TREE_LEN];
             huffman_tree(packet, &mut tree);
@@ -653,15 +652,15 @@ mod bench {
 
     #[divan::bench(args = ALL_CASES)]
     fn decode_message(bencher: Bencher, case: &Case) {
-        let response_bytes = case.request();
-        let packet = &Packet::new(&response_bytes);
+        let content = case.request();
+        let packet = &Packet::new(&content);
         let mut tree = [TreeNode::default(); MAX_TREE_LEN];
         huffman_tree(packet, &mut tree);
         let table = state_tables(&tree);
         bencher
             .counter(BytesCount::from(packet.decoded_bytes_len))
             .bench_local(move || {
-                super::decode_message(black_box(&packet), &table);
+                super::decode_message(black_box(packet), &table);
             });
     }
 
@@ -685,7 +684,7 @@ mod bench {
             .counter(BytesCount::from(2 * packet.decoded_bytes_len))
             .bench_local(move || {
                 black_box(super::decode_packet(black_box(&content2)));
-                black_box(super::decode_message(black_box(&packet), &table));
+                black_box(super::decode_message(black_box(packet), &table));
             });
     }
 }

@@ -131,12 +131,12 @@ mod bench {
 
     #[divan::bench(args = ALL_CASES)]
     fn decode_message(bencher: Bencher, case: &Case) {
-        let response_bytes = case.request();
-        let packet = &Packet::new(&response_bytes);
+        let content = case.request();
+        let packet = &Packet::new(&content);
         let tree = huffman_tree(packet);
         bencher
             .counter(BytesCount::from(packet.decoded_bytes_len))
-            .bench_local(move || black_box(super::decode_message(black_box(&packet), &tree)));
+            .bench_local(move || black_box(super::decode_message(black_box(packet), &tree)));
     }
 
     #[divan::bench(args = ALL_CASES)]

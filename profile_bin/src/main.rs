@@ -244,7 +244,7 @@ fn state_tables(tree: &[HeapNode; MAX_TREE_LEN]) -> StateTables {
         tables: vec![SymbolTable::default(); internal_count as usize],
     };
 
-    let reference_index = child_states.iter().position(|&x| x == 3).unwrap() as usize;
+    let reference_index = child_states.iter().position(|&x| x == 3).unwrap();
     let reference = gen_full_range(
         &tree[reference_index],
         tree,
@@ -345,8 +345,9 @@ fn copy_full_range(
     _table_indices: &[u8; MAX_TREE_LEN],
     reference_table: &SymbolTable,
 ) -> SymbolTable {
-    let mut table = SymbolTable::default();
-    table.symbols = reference_table.symbols;
+    let mut table = SymbolTable {
+        symbols: reference_table.symbols,
+    };
     table.symbols[0..=127]
         .iter_mut()
         .for_each(|x| x[0] = tree[start_node.left_index as usize].symbol.unwrap());
@@ -400,7 +401,7 @@ fn decode_bits<'a>(
     symbols[symbols.len() - 1] = if node.symbol.is_some() {
         0
     } else {
-        unsafe { *table_indices.get_unchecked(node.index.unwrap() as usize) as u8 }
+        unsafe { *table_indices.get_unchecked(node.index.unwrap()) }
     };
 }
 
