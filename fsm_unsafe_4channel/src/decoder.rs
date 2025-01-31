@@ -583,25 +583,12 @@ struct TreeNode {
 
 #[cfg(test)]
 mod tests {
-    use baseline;
-    use common::packet::Packet;
     use common::test_cases::*;
 
     #[test]
     fn decodes_packet() {
-        // let decoded_message = super::decode_packet(&TEST_BYTES);
-        // assert_eq!(decoded_message, EXPECTED_MESSAGE);
-        let case = SAMPLE_CASES[62];
-        let content = &case.request();
-        let expected_result = baseline::decode_packet(content);
-        let result = super::decode_packet(&content);
-        if expected_result != result {
-            println!(" failed case: {:?}", case.name);
-            let packet = &Packet::new(content);
-            println!(" input bytes len: {}", packet.encoded_bytes_len);
-            println!("output bytes len: {}", packet.decoded_bytes_len);
-        }
-        assert_eq!(result, expected_result);
+        let decoded_message = super::decode_packet(&TEST_BYTES);
+        assert_eq!(decoded_message, EXPECTED_MESSAGE);
     }
 }
 

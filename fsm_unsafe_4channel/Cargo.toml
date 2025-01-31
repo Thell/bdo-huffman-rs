@@ -4,7 +4,6 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-common = { workspace = true }
 bitter = "0.7.1"
+common = { workspace = true }
 divan = { workspace = true }
-baseline = { version = "*", path = "../baseline" }

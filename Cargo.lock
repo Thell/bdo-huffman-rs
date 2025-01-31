@@ -246,7 +246,6 @@ dependencies = [
 name = "fsm_unsafe_3channel"
 version = "0.1.0"
 dependencies = [
- "baseline",
  "bitter",
  "common",
  "divan",
@@ -256,7 +255,6 @@ dependencies = [
 name = "fsm_unsafe_4channel"
 version = "0.1.0"
 dependencies = [
- "baseline",
  "bitter",
  "common",
  "divan",
