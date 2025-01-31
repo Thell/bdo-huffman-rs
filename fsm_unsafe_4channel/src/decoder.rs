@@ -51,10 +51,10 @@ fn decode_message(packet: &Packet, table: &StateTables) -> String {
     unsafe {
         // Lookahead is 56 bits
         while bit_reader0.unbuffered_bytes_remaining() > 7 {
-            bit_reader0.refill_lookahead();
-            bit_reader1.refill_lookahead();
-            bit_reader2.refill_lookahead();
-            bit_reader3.refill_lookahead();
+            bit_reader0.refill_lookahead_unchecked();
+            bit_reader1.refill_lookahead_unchecked();
+            bit_reader2.refill_lookahead_unchecked();
+            bit_reader3.refill_lookahead_unchecked();
             for _ in 0..7 {
                 state0 = step(&mut bit_reader0, table, &mut ptr0, state0);
                 state1 = step(&mut bit_reader1, table, &mut ptr1, state1);
@@ -180,6 +180,8 @@ fn decode_message(packet: &Packet, table: &StateTables) -> String {
     }
 }
 
+// removing inline(always) from here when ones below it didn't have it didn't really alter any time.
+#[inline(always)]
 unsafe fn step_state(
     bit_reader: &mut BigEndianReader,
     table: &StateTables,
@@ -204,6 +206,8 @@ unsafe fn step_state(
     next_state
 }
 
+// Removing inline(always) from here while funcs above it have it reduced time from 89 (see next funct)
+// to 26.09
 unsafe fn step(
     bit_reader: &mut BigEndianReader,
     table: &StateTables,
@@ -233,6 +237,8 @@ unsafe fn step(
     next_state
 }
 
+// Removing inline(always) from here while the funcs above have inline improves time from 120 to 89
+// putting the inline back when step and step state didn't have inline improved time from 26.09 to 25.29 (see above)
 #[inline(always)]
 unsafe fn converge(
     bytes1: &[u8],
